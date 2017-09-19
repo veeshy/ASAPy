@@ -285,7 +285,6 @@ if __name__ == "__main__":
     fig, ax = plt.subplots()
 
     ax.plot(dependent_samples[4, :])
-    ax.set_title("Mean values are not 1 $\pm$ 0.05..")
     plt.show()
 
     # correlation is good..
