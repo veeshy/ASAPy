@@ -26,7 +26,7 @@ def correlation_to_cov(std, corr):
     shape = len(std)
     for i in range(shape):
         for j in range(i+1, shape):
-            cov[i, j] = corr[i, j] * (cov[i, i] * cov[j, j]) ** 0.5
+            cov[i, j] = corr[i, j] * std[i] * std[j] #(cov[i, i] * cov[j, j]) ** 0.5
 
     cov = cov + cov.T - np.diag(np.diag(cov))
 
@@ -191,7 +191,7 @@ def lhs_normal_sample(num_samples, means, std_dev):
 
     return samples
 
-def normal_sample_corr(mean_values, desired_cov, num_samples):
+def normal_sample_corr(mean_values, desired_cov, num_samples, allow_singular=False):
     """
     Randomally samples from a normal-multivariate distribution with mean mean_values and cov desired_cov
 
@@ -206,7 +206,7 @@ def normal_sample_corr(mean_values, desired_cov, num_samples):
     np.array
 
     """
-    m = multivariate_normal(mean=mean_values, cov=desired_cov)
+    m = multivariate_normal(mean=mean_values, cov=desired_cov, allow_singular=allow_singular)
     return m.rvs(num_samples)
 
 def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples):
@@ -270,6 +270,8 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples):
         if ae < amin:
             zb = z
             amin = ae
+        else:
+            raise Exception('Could not order samples ae={0}'.format(ae))
 
     # we could transform these back to uniform then transform to another distribution but want normal so we good
 
