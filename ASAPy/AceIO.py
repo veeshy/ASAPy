@@ -24,7 +24,8 @@ class AceEditor:
         self.table = table
         self.energy = table.energy
         self.all_mts = self.table.reactions.keys()
-        self.changed_mts = set()
+        # store the original sigma so it will be easy to retrieve it later
+        self.original_sigma = {}
 
     def get_sigma(self, mt):
         """
@@ -56,28 +57,35 @@ class AceEditor:
             raise Exception('Length of sigma provided does not match energy bins got: {0}, needed: {1}'.format(len(sigma), len(self.energy)))
 
         current_sigma = self.get_sigma(mt)
-        current_sigma = sigma
+        if mt not in self.original_sigma.keys():
+            self.original_sigma[mt] = current_sigma.copy()
 
-        self.changed_mts.add(mt)
+        self.table.find_reaction(mt).sigma = sigma
+
 
     def apply_sum_rules(self):
         """
         Applies ENDF sum rules to all MTs. MTs adjusted in place
 
+        Assumes neutron
+
         References
         ----------
         @trkov2012endf : ENDF6 format manual
+
+        Questions
+        ---------
+        if a summed MT is not present, but some of it's constiuents are, and that summed mt that is not present
+        is present in another MT sum, should the not present MTs constituents be included in the sum?
+        --I think so: if we don't have MT18 but have 19, it should still be in the total xsec
         """
 
         # the sum rules
-        # perform the sums in the exact order listed below to account for when a sum may appear in another sum
+        # potential for round-off error but each mt is summed indvidually so order does not matter.
+        # if a sum mt does not exist, nothing happens
 
         mt_4 = list(range(50, 92))
-        mt_3 = [4, 5, 11, 16, 17, *list(range(22, 38)), 41, 42, 44, 45, 152, 153, 154, *list(range(156, 182)),
-                *list(range(183, 191)), 194, 195, 196, 198, 199, 200]  # contains 4 which is a sum
-
         mt_16 = list(range(875, 892))
-
         mt_18 = [19, 20, 21, 38]
 
         mt_103 = list(range(600, 650))
@@ -85,16 +93,20 @@ class AceEditor:
         mt_105 = list(range(700, 750))
         mt_106 = list(range(750, 800))
         mt_107 = list(range(800, 850))
-        mt_101 = [*list(range(102, 118)), 155, 182, 191, 192, 193, 197]  # contains 103, 104, 105, 106, 107
-        mt_27 = [18, 101]  # has 18 and 101 which are sums themselves
+        mt_101 = [102, *mt_103, *mt_104, *mt_105, *mt_106, *mt_107, *list(range(108, 118)), 155, 182, 191, 192, 193,
+                  197]  # contains 103, 104, 105, 106, 107
+        mt_27 = [*mt_18, *mt_101]  # has 18 and 101 which are sums themselves
 
-        mt_1 = [2, 3]  # contains 3 which is a sum
+        mt_3 = [*mt_4, 5, 11, *mt_16, 17, *mt_18, *list(range(22, 27)), *list(range(28, 38)), 41, 42, 44, 45, *mt_101,
+                152, 153, 154, *list(range(156, 182)),
+                *list(range(183, 191)), 194, 195, 196, 198, 199, 200]  # contains 4 which is a sum
 
-        sum_mts_list = [mt_4, mt_3, mt_16, mt_18, mt_103, mt_104, mt_105, mt_106, mt_107, mt_101, mt_27, mt_1]
-        sum_mts = [4, 3, 16, 18, 103, 104, 105, 106, 107, 101, 27, 1]
+        mt_1 = [2, *mt_3]  # contains 3 which is a sum
+
+        sum_mts_list = [mt_4, mt_16, mt_18, mt_103, mt_104, mt_105, mt_106, mt_107, mt_101, mt_27, mt_3, mt_1]
+        sum_mts = [4, 16, 18, 103, 104, 105, 106, 107, 101, 27, 3, 1]
 
         for sum_mt, mts_in_sum in zip(sum_mts, sum_mts_list):
-
             # ensure the sum'd mt is present before trying to set it
             if sum_mt in self.all_mts:
                 sum_mts_present = self._check_if_mts_present(mts_in_sum)
@@ -128,8 +140,6 @@ class AceEditor:
         return list(search_in_set.intersection(search_set))
 
 
-
-
 class WriteAce:
     """
     A simplistic way of modifying an existing ace file. Essentially a find and replace.
@@ -137,7 +147,7 @@ class WriteAce:
 
     def __init__(self, ace_path):
 
-        self.lines, self.header_lines = self._read_ace_to_a_line(ace_path)
+        self.single_line, self.header_lines = self._read_ace_to_a_line(ace_path)
 
     def _read_ace_to_a_line(self, ace_path):
         """
@@ -195,7 +205,7 @@ class WriteAce:
         original_str_line = self.format_mcnp(array)
 
         try:
-            first_idx_of_data = self.lines.index(original_str_line)
+            first_idx_of_data = self.single_line.index(original_str_line)
         except ValueError:
             raise ValueError("Inputted string not found in the ace file.")
 
@@ -206,7 +216,7 @@ class WriteAce:
 
     def write_ace(self, ace_path_to_write):
 
-        split_all_data_str = self.lines.split()
+        split_all_data_str = self.single_line.split()
 
         with open(ace_path_to_write, 'w') as f:
             # write the header back to the file
