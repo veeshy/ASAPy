@@ -11,7 +11,6 @@ class LoadAce:
         libFile = ace.Library(ace_path)
         libFile.read()
 
-
         if specific_table:
             table = libFile.find_table(specific_table)
         else:
@@ -25,6 +24,7 @@ class LoadAce:
         self.table = table
         self.energy = table.energy
         self.all_mts = self.table.reactions.keys()
+        self.changed_mts = set()
 
     def get_sigma(self, mt):
         """
@@ -45,7 +45,7 @@ class LoadAce:
 
     def set_sigma(self, mt, sigma):
         """
-        Sets the mt sigma
+        Sets the mt sigma and adds the mt to the changed sigma set
         Parameters
         ----------
         mt : int
@@ -57,6 +57,8 @@ class LoadAce:
 
         current_sigma = self.get_sigma(mt)
         current_sigma = sigma
+
+        self.changed_mts.add(mt)
 
     def apply_sum_rules(self):
         """
@@ -102,6 +104,7 @@ class LoadAce:
                         # sum all rows together
                         new_sum = sigmas.sum(axis=0)
                         self.set_sigma(sum_mt, new_sum)
+                        print("Adjusting {0} due to ENDF sum rules".format(sum_mt))
 
 
     def _check_if_mts_present(self, mt_list):
