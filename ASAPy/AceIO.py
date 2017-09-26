@@ -2,7 +2,7 @@ import re
 from pyne import ace
 import numpy as np
 
-class LoadAce:
+class AceEditor:
     """
     Loads a table from an ace file. If there is only one table, loads that table
     """
