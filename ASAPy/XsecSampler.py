@@ -6,6 +6,7 @@ import pandas as pd
 
 from warnings import warn
 
+
 class XsecSampler:
     def __init__(self, h, zaid_1, mt_1, zaid_2=None, mt_2=None):
         """
@@ -28,29 +29,34 @@ class XsecSampler:
         self.corr_df = h['{0}/{1}/{2}/{3}/corr'.format(zaid_1, mt_1, zaid_2, mt_2)] / 1000
 
         # correct the correlation for neg eigenvalues if needed
-        self.corr_df.loc[:, :] = self._fix_non_pos_semi_def_matrix(self.corr_df.values)
+        self.corr_df.loc[:, :] = self._fix_non_pos_semi_def_matrix_eigen(self.corr_df.values)
 
-        # calculate the cov
+    def calc_cov(self):
+        """
+        Calculates the cov from corr and std_dev. May cause matrix to become non-pos def
+
+        Returns
+        -------
+        pd.DataFrame
+            Same info as corr df
+        """
         cov = CovManipulation.correlation_to_cov(self.std_dev_df['s.d.(1)'].values, self.corr_df.values)
-        # fix cov in case the correlation calculation introduced neg eigs
-        cov = self._fix_non_pos_semi_def_matrix(cov)
-
-        # save the cov to a member var
         cov_df = self.corr_df.copy()
         cov_df.loc[:, :] = cov
-        self.cov_df = cov_df
 
-        print('Min eig of cov: {0}'.format(LA.eigvalsh(cov).min()))
+        return cov_df
+
+
 
     def sample(self, sample_type, n, raise_on_bad_sample=False, remove_neg=True, return_relative=True,
-               allow_singular=False):
+               set_neg_to_zero=False):
         """
         Samples using LHS
 
         Parameters
         ----------
         sample_type : str
-            'norm' or 'lhs' to perform multi-variate sampling using these distros
+            'norm' or 'lognorm' to perform multi-variate sampling using these distros
         n : int
             Number of samples
         raise_on_bad_sample : bool
@@ -69,14 +75,14 @@ class XsecSampler:
 
         over_sample_n = n * 2
 
-        if sample_type.lower() == 'lhs':
+        if sample_type.lower() == 'norm':
             samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
                                                              self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
-                                                             over_sample_n)
-        elif sample_type.lower() == 'norm':
-            samples = CovManipulation.normal_sample_corr(self.std_dev_df['x-sec(1)'], self.cov_df, over_sample_n,
-                                                         allow_singular=allow_singular)
-
+                                                             over_sample_n, distro='norm')
+        elif sample_type.lower() == 'lognorm':
+            samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
+                                                             self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
+                                                             over_sample_n, distro='lognorm')
         else:
             raise Exception('Sampling type: {0} not implimented'.format(sample_type))
 
@@ -87,17 +93,22 @@ class XsecSampler:
 
         samples = self._sample_check(samples, mean, remove_neg)
 
-        num_samples_worked = samples.shape[1]
 
-        if num_samples_worked < n:
-            if not raise_on_bad_sample:
-                # try again with bigger n
-                samples = self.sample(sample_type, over_sample_n, raise_on_bad_sample=True,
-                                      remove_neg=remove_neg, return_relative=return_relative,
-                                      allow_singular=allow_singular)
-            else:
-                raise Exception(
-                    'Tried twice to get {0} samples, only was able to make {1}'.format(n / 2, num_samples_worked))
+        if set_neg_to_zero:
+            samples[samples < 0] = 0
+        else:
+            num_samples_worked = samples.shape[1]
+            # over sample to make sure we don't get negative samples.
+            # todo: this should be reworked to not oversample in log normal, or when negative samples are fine
+            if num_samples_worked < n:
+                if not raise_on_bad_sample:
+                    # try again with bigger n
+                    samples = self.sample(sample_type, over_sample_n, raise_on_bad_sample=True,
+                                          remove_neg=remove_neg, return_relative=return_relative,
+                                          allow_singular=allow_singular)
+                else:
+                    raise Exception(
+                        'Tried twice to get {0} samples, only was able to make {1}'.format(n / 2, num_samples_worked))
 
         # grab only n samples
         samples = samples.iloc[:, 0:n]
@@ -134,41 +145,16 @@ class XsecSampler:
         """
 
         eigs, P = LA.eigh(corr_matrix)
+        print('eig_replace: got eig', min(eigs))
         # replace all negative and zero eigs with a small eps
         bad_index = np.where(eigs <= 1e-8)
 
         # set to some small number
-        eigs[bad_index] = 1e-8
+        eigs[bad_index] = min(1e-8 * max(eigs), 1e-8)
 
         # remake the corr matrix with these bad eigenvalues removed
         fixed_corr = np.dot(np.dot(P, np.diag(eigs)), LA.inv(P))
-
-        return fixed_corr
-
-    def _fix_non_pos_semi_def_matrix(self, corr_matrix):
-        """
-        Uses modified cholesky to fix non positive semi-definite matricies.
-
-        Parameters
-        ----------
-        corr_matrix : np.array
-
-        """
-
-        # m = PDP^-1 (np.dot(np.dot(p, np.diag(d)), np.linalg.inv(p)))
-        # P is eigenvectors, D is eigenvalues in diag matrix
-
-        # corr_matrix is always symmetric
-        # eigs, P = LA.eigh(np.float128(corr_matrix))
-        eigs, P = LA.eigh(corr_matrix)
-
-        print('min eig before', min(eigs))
-
-        if min(eigs) < 0:
-            _, L, _ = CovManipulation.gmw_cholesky(corr_matrix)
-            fixed_corr = np.dot(L, L.T)
-            wtf_eigs = LA.eigvalsh(fixed_corr)
-            print('min eig after removing neg', min(wtf_eigs))
+        print('eig_replace: created eig', min(LA.eigvals(fixed_corr)))
 
         return fixed_corr
 
@@ -218,10 +204,21 @@ def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, 
             idx = np.searchsorted(sorted_e, e)
             # convert idx to group # (since we sorted the E from low to high)
             group_num = num_groups - idx + 1  # -> idx 252 is group 1, idx 1 is group 252 (can't have idx 0 by design)
+
+            # do not sample if above the cov bins
+            if group_num > num_groups:
+                grouped_dev.append(1)
+                continue
+
+            if group_num < 1:
+                grouped_dev.append(1)
+                continue
+
             sd = multi_group_val[group_num]
             grouped_dev.append(sd)
 
     return np.array(grouped_dev)
+
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
@@ -241,44 +238,52 @@ if __name__ == "__main__":
         ####
 
         w = XsecSampler(h, 5459, 102)
-        #sample_df = w.sample('norm', 25, allow_singular=True, return_relative=False)
+        # sample_df = w.sample('norm', 25, allow_singular=True, return_relative=False, remove_neg=False)
+        sample_df = w.sample('lognorm', 500, return_relative=True, remove_neg=False, set_neg_to_zero=True)
+
+        # fig, ax = plt.subplots(ncols=3)
+        # ax[0].matshow(np.corrcoef(sample_df))
+        # ax[1].matshow(h['{0}/{1}/{2}/{3}/corr'.format(5459, 102, 5459, 102)])
+        # ax[2].matshow(w.corr_df)
+        # plt.show()
         #
-        # fig, ax = plt.subplots()
+        # fig, ax = plt.subplots()1
         # ax.loglog(w184_102_std['e high'], w184_102_std['s.d.(1)'] , drawstyle='steps-mid', label='Diag(cov) Before')
         # ax.loglog(w184_102_std['e high'], np.diag(np.cov(sample_df)) ** 0.5, drawstyle='steps-mid', label='Diag(cov) After')
         #
         # ax.legend()
         # plt.show()
 
-        #fig, ax = plt.subplots()
-        #ax.loglog(w184_102_std['e high'], sample_df.values, drawstyle='steps-mid', label='Diag(cov) After')
+        # fig, ax = plt.subplots()
+        # ax.loglog(w184_102_std['e high'], sample_df.values, drawstyle='steps-mid', label='Diag(cov) After')
 
-#        ax.legend()
-        #plt.show()
+        #        ax.legend()
+        # plt.show()
         #
         # #### plot corr
-        # fig, ax = plt.subplots(ncols=3, figsize=(12, 6))
-        # cax = ax[0].matshow(w.corr_df.values)
-        # fig.colorbar(cax, ax=ax[0], fraction=0.046, pad=0.04)
+        fig, ax = plt.subplots(ncols=3, figsize=(12, 6))
+        cax = ax[0].matshow(w.corr_df.values)
+        fig.colorbar(cax, ax=ax[0], fraction=0.046, pad=0.04)
+
+        # use the same color bar range as first image
+        ax[1].matshow(np.corrcoef(sample_df))
+        fig.colorbar(cax, ax=ax[1], fraction=0.046, pad=0.04)
         #
-        # cax = ax[1].matshow(np.corrcoef(sample_df))
-        # fig.colorbar(cax, ax=ax[1], fraction=0.046, pad=0.04)
-        # #
-        # # cax = ax[2].matshow(np.corrcoef(sample_df_norm))
-        # # fig.colorbar(cax, ax=ax[2], fraction=0.046, pad=0.04)
-        #
-        # fig.tight_layout()
-        # plt.show()
+        # cax = ax[2].matshow(np.corrcoef(sample_df_norm))
+        # fig.colorbar(cax, ax=ax[2], fraction=0.046, pad=0.04)
+
+        fig.tight_layout()
+        plt.show()
 
         # ####
         # sample_df = w.sample('norm', 500, allow_singular=True, return_relative=True)
-        # fig, ax = plt.subplots()
-        # for i in range(30):
-        #     ax.loglog(e * 1e6, map_groups_to_continuous(e, w184_102_std['e high'], sample_df[i],
-        #                                                 min_e=w184_102_std['e low'].min()) * st, label=i)
-        #
-        # ax.loglog(e * 1e6, st, linestyle='-.', color='k')
-        # ax.set_xlim([180, 190])
-        # ax.set_xscale('linear')
-        # ax.set_yscale('linear')
-        # plt.show()
+        fig, ax = plt.subplots()
+        for i in range(30):
+            ax.loglog(e * 1e6, map_groups_to_continuous(e, w184_102_std['e high'], sample_df[i],
+                                                        min_e=e.min() * 1e6) * st, label=i)
+
+        ax.loglog(e * 1e6, st, linestyle='-.', color='k')
+        #ax.set_xlim([180, 190])
+        #ax.set_xscale('linear')
+        #ax.set_yscale('linear')
+        plt.show()
