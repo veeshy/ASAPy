@@ -119,10 +119,10 @@ class XsecSampler:
 
         return sample_df
 
-    def _fix_non_pos_semi_def_matrix(self, corr_matrix):
+    def _fix_non_pos_semi_def_matrix_eigen(self, corr_matrix):
         """
         Uses eigen-decomposition (m=PDP^-1) to fix non positive semi-definite matricies.
-        If all eig > 1e-13, no changes made
+        If all eig > 1e-8, no changes made
 
         Parameters
         ----------
@@ -133,6 +133,28 @@ class XsecSampler:
         zhu2015sampling appendix a
         """
 
+        eigs, P = LA.eigh(corr_matrix)
+        # replace all negative and zero eigs with a small eps
+        bad_index = np.where(eigs <= 1e-8)
+
+        # set to some small number
+        eigs[bad_index] = 1e-8
+
+        # remake the corr matrix with these bad eigenvalues removed
+        fixed_corr = np.dot(np.dot(P, np.diag(eigs)), LA.inv(P))
+
+        return fixed_corr
+
+    def _fix_non_pos_semi_def_matrix(self, corr_matrix):
+        """
+        Uses modified cholesky to fix non positive semi-definite matricies.
+
+        Parameters
+        ----------
+        corr_matrix : np.array
+
+        """
+
         # m = PDP^-1 (np.dot(np.dot(p, np.diag(d)), np.linalg.inv(p)))
         # P is eigenvectors, D is eigenvalues in diag matrix
 
@@ -140,17 +162,13 @@ class XsecSampler:
         # eigs, P = LA.eigh(np.float128(corr_matrix))
         eigs, P = LA.eigh(corr_matrix)
 
-        # replace all negative and zero eigs with a small eps
-        bad_index = np.where(eigs <= 1e-8)
+        print('min eig before', min(eigs))
 
-        eigs[bad_index] = 1e-8
-
-        # remake the corr matrix with these bad eigenvalues removed
-        fixed_corr = np.dot(np.dot(P, np.diag(eigs)), LA.inv(P))
-
-        wtf_eigs = LA.eigvalsh(fixed_corr)
-        print('min eig after removing neg', min(wtf_eigs))
-        print('min eig desired', min(eigs))
+        if min(eigs) < 0:
+            _, L, _ = CovManipulation.gmw_cholesky(corr_matrix)
+            fixed_corr = np.dot(L, L.T)
+            wtf_eigs = LA.eigvalsh(fixed_corr)
+            print('min eig after removing neg', min(wtf_eigs))
 
         return fixed_corr
 
@@ -210,11 +228,11 @@ if __name__ == "__main__":
     from pyne import ace
 
     with pd.HDFStore('../scale_cov_252.h5', 'r') as h:
-        w184_102_std = h['74184/102/74184/102/std_dev']
+        w184_102_std = h['5459/102/5459/102/std_dev']
 
-        libFile = ace.Library('/Users/veeshy/MCNP6/MCNP_DATA/xdata/endf71x/W/74184.710nc')
+        libFile = ace.Library('../xe135m/Xe135m-n.ace.txt')
         libFile.read()
-        libFile.find_table('74184')
+        libFile.find_table('5459')
         a = libFile.tables[list(libFile.tables.keys())[0]]
 
         e = a.energy
@@ -222,39 +240,45 @@ if __name__ == "__main__":
 
         ####
 
-        w = XsecSampler(h, 74184, 102)
-        sample_df = w.sample('norm', 500, allow_singular=True, return_relative=False)
-
-        fig, ax = plt.subplots()
-        ax.loglog(w184_102_std['e high'], w184_102_std['s.d.(1)'] ** 2, drawstyle='steps-mid', label='Diag(cov) Before')
-        ax.loglog(w184_102_std['e high'], np.diag(np.cov(sample_df)), drawstyle='steps-mid', label='Diag(cov) After')
-
-        ax.legend()
-        plt.show()
-
-        #### plot cov
-        fig, ax = plt.subplots(ncols=3, figsize=(12, 6))
-        cax = ax[0].matshow(w.corr_df.values)
-        fig.colorbar(cax, ax=ax[0], fraction=0.046, pad=0.04)
-
-        cax = ax[1].matshow(np.corrcoef(sample_df))
-        fig.colorbar(cax, ax=ax[1], fraction=0.046, pad=0.04)
+        w = XsecSampler(h, 5459, 102)
+        #sample_df = w.sample('norm', 25, allow_singular=True, return_relative=False)
         #
-        # cax = ax[2].matshow(np.corrcoef(sample_df_norm))
-        # fig.colorbar(cax, ax=ax[2], fraction=0.046, pad=0.04)
+        # fig, ax = plt.subplots()
+        # ax.loglog(w184_102_std['e high'], w184_102_std['s.d.(1)'] , drawstyle='steps-mid', label='Diag(cov) Before')
+        # ax.loglog(w184_102_std['e high'], np.diag(np.cov(sample_df)) ** 0.5, drawstyle='steps-mid', label='Diag(cov) After')
+        #
+        # ax.legend()
+        # plt.show()
 
-        fig.tight_layout()
-        plt.show()
+        #fig, ax = plt.subplots()
+        #ax.loglog(w184_102_std['e high'], sample_df.values, drawstyle='steps-mid', label='Diag(cov) After')
 
-        ####
-        sample_df = w.sample('norm', 500, allow_singular=True, return_relative=True)
-        fig, ax = plt.subplots()
-        for i in range(30):
-            ax.loglog(e * 1e6, map_groups_to_continuous(e, w184_102_std['e high'], sample_df[i],
-                                                        min_e=w184_102_std['e low'].min()) * st, label=i)
+#        ax.legend()
+        #plt.show()
+        #
+        # #### plot corr
+        # fig, ax = plt.subplots(ncols=3, figsize=(12, 6))
+        # cax = ax[0].matshow(w.corr_df.values)
+        # fig.colorbar(cax, ax=ax[0], fraction=0.046, pad=0.04)
+        #
+        # cax = ax[1].matshow(np.corrcoef(sample_df))
+        # fig.colorbar(cax, ax=ax[1], fraction=0.046, pad=0.04)
+        # #
+        # # cax = ax[2].matshow(np.corrcoef(sample_df_norm))
+        # # fig.colorbar(cax, ax=ax[2], fraction=0.046, pad=0.04)
+        #
+        # fig.tight_layout()
+        # plt.show()
 
-        ax.loglog(e * 1e6, st, linestyle='-.', color='k')
-        ax.set_xlim([180, 190])
-        ax.set_xscale('linear')
-        ax.set_yscale('linear')
-        plt.show()
+        # ####
+        # sample_df = w.sample('norm', 500, allow_singular=True, return_relative=True)
+        # fig, ax = plt.subplots()
+        # for i in range(30):
+        #     ax.loglog(e * 1e6, map_groups_to_continuous(e, w184_102_std['e high'], sample_df[i],
+        #                                                 min_e=w184_102_std['e low'].min()) * st, label=i)
+        #
+        # ax.loglog(e * 1e6, st, linestyle='-.', color='k')
+        # ax.set_xlim([180, 190])
+        # ax.set_xscale('linear')
+        # ax.set_yscale('linear')
+        # plt.show()
