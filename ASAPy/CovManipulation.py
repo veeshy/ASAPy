@@ -1,7 +1,7 @@
 import numpy as np
 import SALib.sample.latin as lhs
 from scipy.stats import multivariate_normal
-from scipy.stats.distributions import norm
+from scipy.stats.distributions import norm, lognorm
 
 def correlation_to_cov(std, corr):
     """
@@ -51,9 +51,7 @@ def gmw_cholesky(A):
     """
     Provides a partial cholesky decomposition that is positive def minus a matrix e
 
-    Return `(P, L, e)` such that `MM.T = P.T*A*P = L*L.T - diag(e)`.
-
-
+    Return `(P, L, e)` such that P*L = M ->  `MM.T = P.T*A*P = L*L.T - diag(e)`.
 
     Returns
     -------
@@ -90,7 +88,7 @@ def gmw_cholesky(A):
             xi = max(abs(A[i, j]), xi)
 
     # Calculate delta and beta.
-    delta = _EPS * max(gamma + xi, 1.0) * 100  # 100 added in to help be away from numerical errors of creating a small neg eig - patel
+    delta = _EPS * max(gamma + xi, 1.0)
     if n == 1:
         beta = np.sqrt(max(gamma, _EPS))
     else:
@@ -208,10 +206,11 @@ def normal_sample_corr(mean_values, desired_cov, num_samples, allow_singular=Fal
     np.array
 
     """
+
     m = multivariate_normal(mean=mean_values, cov=desired_cov, allow_singular=allow_singular)
     return m.rvs(num_samples)
 
-def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples):
+def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
     """
     Randomally samples from a normal-multivariate distribution using LHS while attempting to get the desired_cov
 
@@ -220,7 +219,8 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples):
     mean_values
     desired_cov
     num_samples
-
+    distro : str
+        norm, lognorm (no proper handling of corr conversion)
     Returns
     -------
 
@@ -228,7 +228,7 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples):
 
     # draw samples in an uncorrelated manner
     num_vars = len(mean_values)
-    samples = lhs_normal_sample(num_samples, np.zeros(num_vars), np.ones(num_vars))
+    samples = lhs_uniform_sample(num_vars, num_samples)
 
     # cholesky-like decomp for non PD matricies.
     T = np.corrcoef(samples.T)
@@ -240,7 +240,6 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples):
     dependent_samples = np.dot(samples, np.dot(P, np.linalg.inv(Q)).T)
 
     # for il=1:ntry
-
     #     for j=1:nvar
     #         % rank RB
     #         [r,id]=ranking(RB(:,j));
@@ -275,23 +274,53 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples):
         else:
             raise Exception('Could not order samples ae={0}'.format(ae))
 
-    # we could transform these back to uniform then transform to another distribution but want normal so we good
+    # zb are the uniform correlated samples, now transform them to desired
+
+    # transform the uniform sample about the mean to the unit interval
+    for i in range(num_vars):
+        zb[:, i] = (zb[:, i] - min(zb[:, i]))
+        zb[:, i] = zb[:, i] / max(zb[:, i])
+
+        slightly_lt0 = zb[:, i] <= 0.0 + 1e-5
+        slightly_gt1 = zb[:, i] >= 1.0 - 1e-5
+
+        zb[slightly_lt0, i] = 1e-5
+        zb[slightly_gt1, i] = 1.0 - 1e-5
+
+    distro  = distro.lower()
+
+    # using the desired distro's ppf, sample the distro with the correlated uniform sample
+    for i in range(num_vars):
+        # create a norm distro with mean/std_dev then sample from it using percent point func (inv of cdf percentiles)
+        if distro == 'norm':
+            zb[:, i] = norm.ppf(zb[:, i], loc=mean_values[i], scale=std_dev[i])
+        elif distro == 'lognorm':
+            zb[:, i] = lognorm.ppf(zb[:, i], loc=mean_values[i], scale=std_dev[i], s=1.0)  # no scaling (s)
+        else:
+            raise Exception("Distro {0} not supported at the moment".format(distro))
+
+    zb = zb
 
     return zb
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-    desired_corr = np.diag([1]*25) + np.diag([-0.5]*24, 1) + np.diag([-0.5]*24, -1)
-
-    dependent_samples = lhs_normal_sample_corr(np.array(np.ones(25)*20), np.ones(25)*0.05*20, desired_corr, 500)
-
-    fig, ax = plt.subplots()
-
-    ax.plot(dependent_samples[4, :])
-    plt.show()
-
-    # correlation is good..
-    plt.imshow(np.corrcoef(dependent_samples.T))
-    plt.colorbar()
-    plt.show()
+    # import matplotlib.pyplot as plt
+    #
+    # desired_corr = np.diag([1]*25) + np.diag([-0.5]*24, 1) + np.diag([-0.5]*24, -1)
+    #
+    # dependent_samples = lhs_normal_sample_corr(np.array(np.ones(25)*20), np.ones(25)*0.05*20, desired_corr, 500)
+    #
+    # fig, ax = plt.subplots()
+    #
+    # ax.plot(dependent_samples[4, :])
+    # plt.show()
+    #
+    # # correlation is good..
+    # plt.imshow(np.corrcoef(dependent_samples.T))
+    # plt.colorbar()
+    # plt.show()
+    a = np.array([[4, 2, 1], [2, 6, 3], [1, 3, -0.004]])
+    p,r,e = gmw_cholesky(a)
+    #print(np.dot(np.dot(p, a), p.T))
+    m = np.dot(p, r)
+    print(np.dot(m, m.T))
