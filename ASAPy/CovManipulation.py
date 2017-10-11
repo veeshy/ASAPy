@@ -49,9 +49,11 @@ _EPS = _FINFO.eps
 
 def gmw_cholesky(A):
     """
-    Provides a partial cholesky decomposition that is correct minus a matrix e
+    Provides a partial cholesky decomposition that is positive def minus a matrix e
 
-    Return `(P, L, e)` such that `P.T*A*P = L*L.T - diag(e)`.
+    Return `(P, L, e)` such that `MM.T = P.T*A*P = L*L.T - diag(e)`.
+
+
 
     Returns
     -------
@@ -80,15 +82,15 @@ def gmw_cholesky(A):
     #I = identity(n, Float64)
 
     # Calculate gamma(A) and xi(A).
-    gamma = 0.0
-    xi = 0.0
+    gamma = 0.0  # largest value diag
+    xi = 0.0  # largest value off-diag
     for i in range(n):
         gamma = max(abs(A[i, i]), gamma)
         for j in range(i+1, n):
             xi = max(abs(A[i, j]), xi)
 
     # Calculate delta and beta.
-    delta = _EPS * max(gamma + xi, 1.0)
+    delta = _EPS * max(gamma + xi, 1.0) * 100  # 100 added in to help be away from numerical errors of creating a small neg eig - patel
     if n == 1:
         beta = np.sqrt(max(gamma, _EPS))
     else:
@@ -111,15 +113,15 @@ def gmw_cholesky(A):
 
         # Interchange row and column j and q (if j != q).
         if q != j:
-            # Temporary permutation matrix for swaping 2 rows or columns.
+            # Temporary permutation matrix for swapping 2 rows or columns.
             p = np.eye(n, dtype=float)
 
-            # Modify the permutation matrix P by swaping columns.
+            # Modify the permutation matrix P by swapping columns.
             row_P = 1.0*P[:, q]
             P[:, q] = P[:, j]
             P[:, j] = row_P
 
-            # Modify the permutation matrix p by swaping rows (same as
+            # Modify the permutation matrix p by swapping rows (same as
             # columns because p = pT).
             row_p = 1.0*p[q]
             p[q] = p[j]
