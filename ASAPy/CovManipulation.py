@@ -295,11 +295,12 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, dist
         if distro == 'norm':
             zb[:, i] = norm.ppf(zb[:, i], loc=mean_values[i], scale=std_dev[i])
         elif distro == 'lognorm':
-            zb[:, i] = lognorm.ppf(zb[:, i], loc=mean_values[i], scale=std_dev[i], s=1.0)  # no scaling (s)
+            # using mu/sigma from wiki + the scipy convention of loc and scale to specify the mean and sigma
+            mean = np.log(mean_values[i] / (1 + std_dev[i]**2/mean_values[i]**2)**0.5)
+            sigma = (np.log(1 + std_dev[i]**2/mean_values[i]**2))**0.5
+            zb[:, i] = np.exp(norm.ppf(zb[:, i], loc=mean, scale=sigma))
         else:
             raise Exception("Distro {0} not supported at the moment".format(distro))
-
-    zb = zb
 
     return zb
 
