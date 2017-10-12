@@ -239,7 +239,7 @@ if __name__ == "__main__":
 
         w = XsecSampler(h, 5459, 102)
         # sample_df = w.sample('norm', 25, allow_singular=True, return_relative=False, remove_neg=False)
-        sample_df = w.sample('lognorm', 500, return_relative=True, remove_neg=False, set_neg_to_zero=True)
+        sample_df = w.sample('lognorm', 500, return_relative=True, remove_neg=False, set_neg_to_zero=False)
 
         # fig, ax = plt.subplots(ncols=3)
         # ax[0].matshow(np.corrcoef(sample_df))
@@ -276,9 +276,8 @@ if __name__ == "__main__":
         plt.show()
 
         # ####
-        # sample_df = w.sample('norm', 500, allow_singular=True, return_relative=True)
         fig, ax = plt.subplots()
-        for i in range(30):
+        for i in range(10):
             ax.loglog(e * 1e6, map_groups_to_continuous(e, w184_102_std['e high'], sample_df[i],
                                                         min_e=e.min() * 1e6) * st, label=i)
 
