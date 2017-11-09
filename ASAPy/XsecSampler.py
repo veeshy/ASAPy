@@ -1,16 +1,37 @@
-from ASAPy import CovManipulation
-
-import scipy.linalg as LA
+# from warnings import warn
+#
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-from warnings import warn
-
+import scipy.linalg as LA
+from pyne import ace
+#
+from ASAPy import CovManipulation
+#
 
 class XsecSampler:
     def __init__(self, h, zaid_1, mt_1, zaid_2=None, mt_2=None):
         """
         Sampling methods for cross-sections
+        Parameters
+        ----------
+        h : pd.HDF5Store
+        zaid_1 : int or str
+        mt_1 : int or str
+        zaid_2 : None or int or str
+        mt_2 : None or int or str
+        """
+
+        # load the cov and std_dev from the store
+        self.std_dev_df, self.corr_df = self.load_zaid_mt(h, zaid_1, mt_1, zaid_2, mt_2)
+
+        # correct the correlation for neg eigenvalues if needed
+        self.corr_df.loc[:, :] = self._fix_non_pos_semi_def_matrix_eigen(self.corr_df.values)
+
+    @staticmethod
+    def load_zaid_mt(h, zaid_1, mt_1, zaid_2=None, mt_2=None):
+        """
+        Loads the relevant std dev and corr df's
         Parameters
         ----------
         h : pd.HDF5Store
@@ -25,11 +46,10 @@ class XsecSampler:
             mt_2 = mt_1
 
         # load the cov and std_dev from the store
-        self.std_dev_df = h['{0}/{1}/{2}/{3}/std_dev'.format(zaid_1, mt_1, zaid_2, mt_2)]
-        self.corr_df = h['{0}/{1}/{2}/{3}/corr'.format(zaid_1, mt_1, zaid_2, mt_2)] / 1000
+        std_dev_df = h['{0}/{1}/{2}/{3}/std_dev'.format(zaid_1, mt_1, zaid_2, mt_2)]
+        corr_df = h['{0}/{1}/{2}/{3}/corr'.format(zaid_1, mt_1, zaid_2, mt_2)] / 1000
 
-        # correct the correlation for neg eigenvalues if needed
-        self.corr_df.loc[:, :] = self._fix_non_pos_semi_def_matrix_eigen(self.corr_df.values)
+        return std_dev_df, corr_df
 
     def calc_cov(self):
         """
@@ -104,8 +124,7 @@ class XsecSampler:
                 if not raise_on_bad_sample:
                     # try again with bigger n
                     samples = self.sample(sample_type, over_sample_n, raise_on_bad_sample=True,
-                                          remove_neg=remove_neg, return_relative=return_relative,
-                                          allow_singular=allow_singular)
+                                          remove_neg=remove_neg, return_relative=return_relative)
                 else:
                     raise Exception(
                         'Tried twice to get {0} samples, only was able to make {1}'.format(n / 2, num_samples_worked))
@@ -220,69 +239,151 @@ def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, 
     return np.array(grouped_dev)
 
 
+def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', remove_neg=False):
+    """
+    Samples the cov store for cross-section values based on the mat_num, mt, and sample type
+
+    Parameters
+    ----------
+    cov_hdf_store : pd.HDFStore
+        The SCALE/TENDL store containing cov info with keys like 92235/102/92235/102/std_dev
+    mt : int
+        The reaction MT number to sample
+    zaid : int
+        The ZAID for the cross-section to sample
+    num_samples : int
+    sample_type : str
+        'lognorm' or 'norm' for sampling the data
+    remove_neg : boolean
+        Flag to remove samples if they are negative (Removes full samples not just sets neg to zero)
+
+    Returns
+    pd.DataFrame
+        The sampled df, relative values
+    pd.DataFrame
+        The sampled df, full values
+    -------
+
+    """
+    #cov_hdf_store = 'scale_cov_252.h5'
+    h = pd.HDFStore(cov_hdf_store, 'r')
+
+    # sample data, keep the relative and full values sampled for plotting later
+    xsec = XsecSampler(h, zaid, mt)
+
+    sample_df = xsec.sample(sample_type, num_samples, return_relative=True, remove_neg=remove_neg)
+    mean = xsec.std_dev_df['x-sec(1)']
+    # get the full values by multiplying in the mean by having the internal sample checker "normalize" the values to the 1/mean
+
+    sample_df_full_vals = xsec._sample_check(sample_df, 1/mean, remove_neg=False)
+
+    return sample_df, sample_df_full_vals
+
+def get_mt_from_ace(ace_file, zaid, mt):
+    """
+    Loads mt from base_ace file
+    Parameters
+    ----------
+    ace_file : str
+        Path to ace file
+    zaid : int
+        The ZAID in the ace file
+    mt : int
+        The MT reaction number
+
+    Returns
+    -------
+    np.array
+        Energy values
+    np.array
+        Cross-section values
+    """
+
+    # base_ace = './xe135m/Xe135m-n.ace.txt'
+    libFile = ace.Library(ace_file)
+    libFile.read()
+    libFile.find_table(str(zaid))
+    xsec_tables = libFile.tables[list(libFile.tables.keys())[0]]
+
+    e = xsec_tables.energy
+    st = xsec_tables.find_reaction(mt).sigma
+
+    return e, st
+
+def plot_sampled_info(ace_file, h, zaid, mt, sample_df_full_vals, zaid_2=None, mt_2=None):
+    """
+    Plots diag of cov, a few xsecs, and full corr matrix of the sampled data
+    Parameters
+    ----------
+    ace_file
+    h
+    zaid
+    mt
+    sample_df_full_vals
+    zaid_2
+    mt_2
+
+    Returns
+    -------
+
+    """
+    # plot the cov
+    xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
+
+    fig, ax = plt.subplots()
+    ax.loglog(xsec['e high'], xsec['s.d.(1)'] ** 2, drawstyle='steps-mid', label='Diag(cov) ENDF')
+    ax.loglog(xsec['e high'], np.diag(np.cov(sample_df_full_vals)), drawstyle='steps-mid', label='Diag(cov) Sampled')
+    ax.legend()
+    ax.set_xlabel("Energy (eV)")
+    ax.set_ylabel("Cross-Section (b)")
+    plt.savefig("{0}_{1}_sampled_cov.eps".format(zaid, mt), bbox_inches='tight')
+
+    # Plot some xsec
+    e, st = get_mt_from_ace(ace_file, zaid, mt)
+
+    fig, ax = plt.subplots()
+    num_xsec = 20
+    # ensure we don't try to plot too many
+    if num_xsec > len(xsec):
+        num_xsec = len(xsec)
+
+    for i in range(num_xsec):
+        ax.loglog(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df_full_vals[i],
+                                                    min_e=xsec['e low'].min() - 1) * st, label=i)
+    # plot the base x-sec too
+    ax.loglog(e * 1e6, st, linestyle='-.', color='k')
+
+    ax.set_xlabel('Energy (Ev)')
+    ax.set_ylabel('Cross Section (b)')
+
+    plt.savefig("{0}_{1}_few_sampled_xsec.eps".format(zaid, mt), bbox_inches='tight')
+
+    # Plot the corr matrix
+    fig, ax = plt.subplots(ncols=2, figsize=(8, 6))
+    cax = ax[0].matshow(corr.values)
+    fig.colorbar(cax, ax=ax[0], fraction=0.046, pad=0.04)
+    ax[0].set_xlabel('Group')
+    ax[0].xaxis.set_label_position('top')
+    ax[0].set_ylabel('Group')
+
+    ax[1].matshow(np.corrcoef(sample_df_full_vals))
+    fig.colorbar(cax, ax=ax[1], fraction=0.046, pad=0.04)
+    ax[1].set_xlabel('Group')
+    ax[1].xaxis.set_label_position('top')
+    ax[1].set_ylabel('Group')
+
+    fig.tight_layout()
+    plt.savefig("{0}_{1}_sampled_corr_compare.eps".format(zaid, mt), bbox_inches='tight')
+
+
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    from pyne import ace
 
-    with pd.HDFStore('../scale_cov_252.h5', 'r') as h:
-        w184_102_std = h['5459/102/5459/102/std_dev']
+    store_name = '../scale_cov_252.h5'
+    with pd.HDFStore(store_name, 'r') as h:
 
-        libFile = ace.Library('../xe135m/Xe135m-n.ace.txt')
-        libFile.read()
-        libFile.find_table('5459')
-        a = libFile.tables[list(libFile.tables.keys())[0]]
+        ace_file = '../xe135m/Xe135m-n.ace.txt'
+        zaid = 5459
+        mt = 102
 
-        e = a.energy
-        st = a.find_reaction(102).sigma
-
-        ####
-
-        w = XsecSampler(h, 5459, 102)
-        # sample_df = w.sample('norm', 25, allow_singular=True, return_relative=False, remove_neg=False)
-        sample_df = w.sample('lognorm', 500, return_relative=True, remove_neg=False, set_neg_to_zero=False)
-
-        # fig, ax = plt.subplots(ncols=3)
-        # ax[0].matshow(np.corrcoef(sample_df))
-        # ax[1].matshow(h['{0}/{1}/{2}/{3}/corr'.format(5459, 102, 5459, 102)])
-        # ax[2].matshow(w.corr_df)
-        # plt.show()
-        #
-        # fig, ax = plt.subplots()1
-        # ax.loglog(w184_102_std['e high'], w184_102_std['s.d.(1)'] , drawstyle='steps-mid', label='Diag(cov) Before')
-        # ax.loglog(w184_102_std['e high'], np.diag(np.cov(sample_df)) ** 0.5, drawstyle='steps-mid', label='Diag(cov) After')
-        #
-        # ax.legend()
-        # plt.show()
-
-        # fig, ax = plt.subplots()
-        # ax.loglog(w184_102_std['e high'], sample_df.values, drawstyle='steps-mid', label='Diag(cov) After')
-
-        #        ax.legend()
-        # plt.show()
-        #
-        # #### plot corr
-        fig, ax = plt.subplots(ncols=3, figsize=(12, 6))
-        cax = ax[0].matshow(w.corr_df.values)
-        fig.colorbar(cax, ax=ax[0], fraction=0.046, pad=0.04)
-
-        # use the same color bar range as first image
-        ax[1].matshow(np.corrcoef(sample_df))
-        fig.colorbar(cax, ax=ax[1], fraction=0.046, pad=0.04)
-        #
-        # cax = ax[2].matshow(np.corrcoef(sample_df_norm))
-        # fig.colorbar(cax, ax=ax[2], fraction=0.046, pad=0.04)
-
-        fig.tight_layout()
-        plt.show()
-
-        # ####
-        fig, ax = plt.subplots()
-        for i in range(10):
-            ax.loglog(e * 1e6, map_groups_to_continuous(e, w184_102_std['e high'], sample_df[i],
-                                                        min_e=e.min() * 1e6) * st, label=i)
-
-        ax.loglog(e * 1e6, st, linestyle='-.', color='k')
-        #ax.set_xlim([180, 190])
-        #ax.set_xscale('linear')
-        #ax.set_yscale('linear')
-        plt.show()
+        sample_df, sample_df_full = sample_xsec(store_name, mt, zaid, 500)
+        plot_sampled_info(ace_file, h, zaid, mt, sample_df_full)
