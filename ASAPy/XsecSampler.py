@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import scipy.linalg as LA
 from pyne import ace
+from matplotlib import gridspec
 #
 from ASAPy import CovManipulation
 #
@@ -265,17 +266,16 @@ def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', rem
     -------
 
     """
-    #cov_hdf_store = 'scale_cov_252.h5'
     h = pd.HDFStore(cov_hdf_store, 'r')
 
     # sample data, keep the relative and full values sampled for plotting later
     xsec = XsecSampler(h, zaid, mt)
 
-    sample_df = xsec.sample(sample_type, num_samples, return_relative=True, remove_neg=remove_neg)
-    mean = xsec.std_dev_df['x-sec(1)']
+    sample_df_full_vals = xsec.sample(sample_type, num_samples, return_relative=False, remove_neg=remove_neg)
+    mean = xsec.std_dev_df['x-sec(1)'].values
     # get the full values by multiplying in the mean by having the internal sample checker "normalize" the values to the 1/mean
 
-    sample_df_full_vals = xsec._sample_check(sample_df, 1/mean, remove_neg=False)
+    sample_df = xsec._sample_check(sample_df_full_vals.T, mean, remove_neg=False)
 
     return sample_df, sample_df_full_vals
 
@@ -310,7 +310,7 @@ def get_mt_from_ace(ace_file, zaid, mt):
 
     return e, st
 
-def plot_sampled_info(ace_file, h, zaid, mt, sample_df_full_vals, zaid_2=None, mt_2=None):
+def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zaid_2=None, mt_2=None):
     """
     Plots diag of cov, a few xsecs, and full corr matrix of the sampled data
     Parameters
@@ -335,7 +335,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df_full_vals, zaid_2=None, m
     ax.loglog(xsec['e high'], np.diag(np.cov(sample_df_full_vals)), drawstyle='steps-mid', label='Diag(cov) Sampled')
     ax.legend()
     ax.set_xlabel("Energy (eV)")
-    ax.set_ylabel("Cross-Section (b)")
+    ax.set_ylabel("Covariance")
     plt.savefig("{0}_{1}_sampled_cov.eps".format(zaid, mt), bbox_inches='tight')
 
     # Plot some xsec
@@ -347,11 +347,16 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df_full_vals, zaid_2=None, m
     if num_xsec > len(xsec):
         num_xsec = len(xsec)
 
-    for i in range(num_xsec):
-        ax.loglog(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df_full_vals[i],
-                                                    min_e=xsec['e low'].min() - 1) * st, label=i)
     # plot the base x-sec too
     ax.loglog(e * 1e6, st, linestyle='-.', color='k')
+
+    for i in range(num_xsec):
+        ax.loglog(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[i],
+                                                    min_e=xsec['e low'].min() - 1) * st, label=i)
+    # plot the base again so it appears on top
+    ax.loglog(e * 1e6, st, linestyle='-.', color='k')
+
+    ax.legend(['Base', '(all others) Samples'])
 
     ax.set_xlabel('Energy (Ev)')
     ax.set_ylabel('Cross Section (b)')
@@ -375,6 +380,23 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df_full_vals, zaid_2=None, m
     fig.tight_layout()
     plt.savefig("{0}_{1}_sampled_corr_compare.eps".format(zaid, mt), bbox_inches='tight')
 
+    # plot the xsec + the std_dev
+    fig = plt.figure(figsize=(6, 4))
+    gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
+
+    ax = fig.add_subplot(gs[0])
+    ax.loglog(e * 1e6, st)
+    ax.get_xaxis().set_visible(False)
+    ax.set_ylabel('Cross-Section (b)')
+
+    ax = fig.add_subplot(gs[1], sharex=ax)  # the above ax
+    ax.plot(xsec['e high'], xsec['rel.s.d.(1)'], drawstyle='steps-mid')
+    ax.set_xscale('log')
+    ax.set_xlabel('Energy (eV)')
+    ax.set_ylabel('Relative Dev.')
+
+    plt.savefig("{0}_{1}_base_xsec_with_std.eps".format(zaid, mt), bbox_inches='tight')
+
 
 if __name__ == "__main__":
 
@@ -386,4 +408,5 @@ if __name__ == "__main__":
         mt = 102
 
         sample_df, sample_df_full = sample_xsec(store_name, mt, zaid, 500)
-        plot_sampled_info(ace_file, h, zaid, mt, sample_df_full)
+
+        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full)
