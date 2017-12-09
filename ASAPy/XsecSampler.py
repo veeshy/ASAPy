@@ -8,6 +8,7 @@ from pyne import ace
 from matplotlib import gridspec
 #
 from ASAPy import CovManipulation
+from ASAPy import AceIO
 #
 
 class XsecSampler:
@@ -266,7 +267,7 @@ def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', rem
     -------
 
     """
-    h = pd.HDFStore(cov_hdf_store, 'r')
+    h = cov_hdf_store
 
     # sample data, keep the relative and full values sampled for plotting later
     xsec = XsecSampler(h, zaid, mt)
@@ -300,7 +301,7 @@ def get_mt_from_ace(ace_file, zaid, mt):
     """
 
     # base_ace = './xe135m/Xe135m-n.ace.txt'
-    libFile = ace.Library(ace_file)
+    libFile = ace.Library(os.path.expanduser(ace_file))
     libFile.read()
     libFile.find_table(str(zaid))
     xsec_tables = libFile.tables[list(libFile.tables.keys())[0]]
@@ -398,15 +399,50 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     plt.savefig("{0}_{1}_base_xsec_with_std.eps".format(zaid, mt), bbox_inches='tight')
 
 
+def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='xsec_sampled_{0}', zaid_2=None, mt_2=None):
+    """
+    Write sampled data to files + the group-wise sampled data to a csv
+
+    :param h: the cov h5 handle
+    :param ace_file:
+    :param sample_df_rel:
+    :param output_formatter:
+    :return:
+    """
+
+    # load the cov to get the mapping
+    xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
+
+    ae = AceIO.AceEditor(ace_file)
+    e = ae.energy
+    original_sigma = ae.get_sigma(mt)
+
+    # sample_df contains relative values (sampled / mean) which are then multiplied by the actual continuous xsec and written to an ace file
+    for idx, col in sample_df_rel.iteritems():
+        # set the sigma in place
+        ae.set_sigma(mt, map_groups_to_continuous(e, xsec['e high'], col,
+                                                   min_e=xsec['e low'].min()) * original_sigma)
+        ae.apply_sum_rules()
+
+        w = AceIO.WriteAce(ace_file)
+        w.replace_array(original_sigma, ae.get_sigma(102))
+        w.write_ace(output_formatter.format(idx))
+
+    sample_df.to_csv('{0}.csv'.format(output_formatter.format('samples')))
+
+
 if __name__ == "__main__":
+    import os
 
     store_name = '../scale_cov_252.h5'
     with pd.HDFStore(store_name, 'r') as h:
 
-        ace_file = '../xe135m/Xe135m-n.ace.txt'
-        zaid = 5459
+        ace_file = '~/local/MCNP6/MCNP_DATA/xdata/endf71x/C/6000.710nc'
+        zaid = 6000
         mt = 102
 
-        sample_df, sample_df_full = sample_xsec(store_name, mt, zaid, 500)
+        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 500)
 
         plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full)
+
+        write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='/home/user/projects/ASAPy/c/c__{0}')

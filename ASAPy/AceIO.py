@@ -1,6 +1,7 @@
 import re
 from pyne import ace
 import numpy as np
+import os
 
 class AceEditor:
     """
@@ -8,6 +9,7 @@ class AceEditor:
     """
 
     def __init__(self, ace_path, specific_table=None):
+        ace_path = os.path.expanduser(ace_path)
         libFile = ace.Library(ace_path)
         libFile.read()
 
@@ -153,7 +155,7 @@ class WriteAce:
         """
         Read the ace file to adjust to a single line with no spaces
         """
-
+        ace_path = os.path.expanduser(ace_path)
         with open(ace_path, 'r') as f:
             lines = f.readlines()
 
@@ -200,7 +202,7 @@ class WriteAce:
         """
 
         if len(array) != len(replace_with):
-            raise Exception("Arrays must be equal lenght for replacement.")
+            raise Exception("Arrays must be equal length for replacement.")
 
         original_str_line = self.format_mcnp(array)
 
@@ -217,6 +219,7 @@ class WriteAce:
     def write_ace(self, ace_path_to_write):
 
         split_all_data_str = self.single_line.split()
+        ace_path_to_write = os.path.expanduser(ace_path_to_write)
 
         with open(ace_path_to_write, 'w') as f:
             # write the header back to the file
