@@ -78,6 +78,9 @@ _THERMAL_DATA = {
     75: ThermalTuple('ouo2', [8016, 8017, 8018], 1),
 }
 
+energy_groups = [2.0000E7, 1.7333E7, 1.5683E7, 1.4550E7, 1.3840E7, 1.2840E7, 1.0000E7, 8.1873E6, 6.4340E6, 4.8000E6, 4.3040E6, 3.0000E6, 2.4790E6, 2.3540E6, 1.8500E6, 1.5000E6, 1.4000E6, 1.3560E6, 1.3170E6, 1.2500E6, 1.2000E6, 1.1000E6, 1.0100E6, 9.2000E5, 9.0000E5, 8.7500E5, 8.6110E5, 8.2000E5, 7.5000E5, 6.7900E5, 6.7000E5, 6.0000E5, 5.7300E5, 5.5000E5, 4.9952E5, 4.7000E5, 4.4000E5, 4.2000E5, 4.0000E5, 3.3000E5, 2.7000E5, 2.0000E5, 1.5000E5, 1.2830E5, 1.0000E5, 8.5000E4, 8.2000E4, 7.5000E4, 7.3000E4, 6.0000E4, 5.2000E4, 5.0000E4, 4.5000E4, 3.0000E4, 2.5000E4, 1.7000E4, 1.3000E4, 9.5000E3, 8.0300E3, 6.0000E3, 3.9000E3, 3.7400E3, 3.0000E3, 2.5800E3, 2.2900E3, 2.2000E3, 1.8000E3, 1.5500E3, 1.5000E3, 1.1500E3, 9.5000E2, 6.8300E2, 6.7000E2, 5.5000E2, 3.0500E2, 2.8500E2, 2.4000E2, 2.1000E2, 2.0750E2, 1.9250E2, 1.8600E2, 1.2200E2, 1.1900E2, 1.1500E2, 1.0800E2, 1.0000E2, 9.0000E1, 8.2000E1, 8.0000E1, 7.6000E1, 7.2000E1, 6.7500E1, 6.5000E1, 6.1000E1, 5.9000E1, 5.3400E1, 5.2000E1, 5.0600E1, 4.9200E1, 4.8300E1, 4.7000E1, 4.5200E1, 4.4000E1, 4.2400E1, 4.1000E1, 3.9600E1, 3.9100E1, 3.8000E1, 3.7000E1, 3.5500E1, 3.4600E1, 3.3750E1, 3.3250E1, 3.1750E1, 3.1250E1, 3.0000E1, 2.7500E1, 2.5000E1, 2.2500E1, 2.1000E1, 2.0000E1, 1.9000E1, 1.8500E1, 1.7000E1, 1.6000E1, 1.5100E1, 1.4400E1, 1.3750E1, 1.2900E1, 1.1900E1, 1.1500E1, 1.0000E1, 9.1000E0, 8.1000E0, 7.1500E0, 7.0000E0, 6.7500E0, 6.5000E0, 6.2500E0, 6.0000E0, 5.4000E0, 5.0000E0, 4.7500E0, 4.0000E0, 3.7300E0, 3.5000E0, 3.1500E0, 3.0500E0, 3.0000E0, 2.9700E0, 2.8700E0, 2.7700E0, 2.6700E0, 2.5700E0, 2.4700E0, 2.3800E0, 2.3000E0, 2.2100E0, 2.1200E0, 2.0000E0, 1.9400E0, 1.8600E0, 1.7700E0, 1.6800E0, 1.5900E0, 1.5000E0, 1.4500E0, 1.4000E0, 1.3500E0, 1.3000E0, 1.2500E0, 1.2250E0, 1.2000E0, 1.1750E0, 1.1500E0, 1.1400E0, 1.1300E0, 1.1200E0, 1.1100E0, 1.1000E0, 1.0900E0, 1.0800E0, 1.0700E0, 1.0600E0, 1.0500E0, 1.0400E0, 1.0300E0, 1.0200E0, 1.0100E0, 1.0000E0, 9.7500E-1, 9.5000E-1, 9.2500E-1, 9.0000E-1, 8.5000E-1, 8.0000E-1, 7.5000E-1, 7.0000E-1, 6.5000E-1, 6.2500E-1, 6.0000E-1, 5.5000E-1, 5.0000E-1, 4.5000E-1, 4.0000E-1, 3.7500E-1, 3.5000E-1, 3.2500E-1, 3.0000E-1, 2.7500E-1, 2.5000E-1, 2.2500E-1, 2.0000E-1, 1.7500E-1, 1.5000E-1, 1.2500E-1, 1.0000E-1, 9.0000E-2, 8.0000E-2, 7.0000E-2, 6.0000E-2, 5.0000E-2, 4.0000E-2, 3.0000E-2, 2.5300E-2, 1.0000E-2, 7.5000E-3, 5.0000E-3, 4.0000E-3, 3.0000E-3, 2.5000E-3, 2.0000E-3, 1.5000E-3, 1.2000E-3, 1.0000E-3, 7.5000E-4, 5.0000E-4, 1.0000E-4, 1.0000E-5]
+energy_groups = energy_groups[-1::-1]
+
 _TEMPLATE_RECONR = """
 reconr / %%%%%%%%%%%%%%%%%%% Reconstruct XS for neutrons %%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {npendf}
@@ -137,6 +140,44 @@ thermr / %%%%%%%%%%%%%%%% Add thermal scattering data (bound) %%%%%%%%%%%%%%%%%%
 {error} {energy_max}
 """
 
+"""
+mfcov int
+    the cov mf # to read, one of: 31, 33, 34, 35 or 40. 33 default for NJOY but must be provided here
+"""
+_TEMPLATE_ERRORR = """
+errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{nendf} {nerr_in} 0 {nerr}/
+{mat} 1/
+0 {temperature}/
+0 {mfcov}/
+{cov_ngroups}/
+{cov_group_bounds}/
+"""
+
+_TEMPLATE_COVR_FOR_PLOT = """
+covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{nerr} 0 {covr_plot_out}/
+1/
+/
+1 2/
+{mat} 1 {mat} 1/
+{mat} 102 {mat} 102/
+"""
+
+_TEMPLATE_COVR_FOR_TEXT = """
+covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{nerr} {covr_out}/
+1/
+/
+/
+{mat}/
+"""
+
+_TEMPLATE_VIEWR = """
+viewr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Plots %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{covr_plot_out} {viewr_plot_out}/
+"""
+
 _THERMAL_TEMPLATE_ACER = """
 acer / %%%%%%%%%%%%%%%%%%%%%%%% Write out in ACE format %%%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {nthermal_acer_in} 0 {nace} {ndir}
@@ -149,7 +190,7 @@ acer / %%%%%%%%%%%%%%%%%%%%%%%% Write out in ACE format %%%%%%%%%%%%%%%%%%%%%%%%
 
 
 def run(commands, tapein, tapeout, input_filename=None, stdout=False,
-        njoy_exec='njoy'):
+        njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy'):
     """Run NJOY with given commands
 
     Parameters
@@ -240,7 +281,7 @@ def make_pendf(filename, pendf='pendf', error=0.001, stdout=False):
 
 
 def make_ace(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=None,
-             error=0.001, broadr=True, heatr=True, purr=True, acer=True,
+             error=0.001, broadr=True, heatr=True, purr=True, acer=True, errorr=True,
              **kwargs):
     """Generate incident neutron ACE file from an ENDF file
 
@@ -267,6 +308,8 @@ def make_ace(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=None,
         Indicating whether to add probability table when running NJOY
     acer : bool, optional
         Indicating whether to generate ACE file when running NJOY
+    errorr : bool, optional
+        Indicating whether to generate covariances when running NJOY
     **kwargs
         Keyword arguments passed to :func:`openmc.data.njoy.run`
 
@@ -306,11 +349,36 @@ def make_ace(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=None,
         nbroadr = nlast + 1
         commands += _TEMPLATE_BROADR
         nlast = nbroadr
+        
+    if errorr:
+        cov_ngroups = len(energy_groups) - 1
+        for i, temperature in enumerate(temperatures):
+            nerr_in = nbroadr  # PENDF tape that was broadened to right temp
+            nerr = nlast + 1
+            mfcov = 33
+            cov_group_bounds = [str(e) for e in energy_groups]
+            # inefficient way to ensure we don't go past 80 chars for fortran limitations
+            cov_group_bounds = ' \n'.join(cov_group_bounds)
+            commands += _TEMPLATE_ERRORR.format(**locals())
+            nlast += 1
+
+            covr_out = nlast + 1
+            nlast += 1
+            commands += _TEMPLATE_COVR_FOR_TEXT.format(**locals())
+
+            covr_plot_out = nlast + 1   # needed as input to viewr
+            nlast += 1
+
+            viewr_plot_out = nlast + 1
+            nlast += 1
+
+            commands += _TEMPLATE_COVR_FOR_PLOT.format(**locals())
+            commands += _TEMPLATE_VIEWR.format(**locals())
 
     # heatr
     if heatr:
-        nheatr_in = nlast
-        nheatr = nheatr_in + 1
+        nheatr_in = nbroadr
+        nheatr = nlast + 1
         commands += _TEMPLATE_HEATR
         nlast = nheatr
 
@@ -451,6 +519,7 @@ def make_ace_thermal(filename, filename_thermal, temperatures=None,
     commands = ""
 
     nendf, nthermal_endf, npendf = 20, 21, 22
+    # todo cp to a tape file here
     tapein = {nendf: filename, nthermal_endf:filename_thermal}
     tapeout = {}
 
@@ -502,3 +571,8 @@ def make_ace_thermal(filename, filename_thermal, temperatures=None,
     for temperature in temperatures:
         os.remove(fname.format(ace, temperature))
         os.remove(fname.format(xsdir, temperature))
+        
+if __name__ == "__main__":
+    make_ace('../data/tape20', temperatures=[300], ace='ace', xsdir='xsdir', pendf=None,
+                 error=0.001, broadr=True, heatr=False, purr=False, acer=False, errorr=True, **{'input_filename': '../data/cov_w184.i'})
+    
