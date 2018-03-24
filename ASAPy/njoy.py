@@ -145,7 +145,7 @@ mfcov int
     the cov mf # to read, one of: 31, 33, 34, 35 or 40. 33 default for NJOY but must be provided here
 """
 _TEMPLATE_ERRORR = """
-errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {nerr_in} 0 {nerr}/
 {mat} 1/
 0 {temperature}/
@@ -155,7 +155,7 @@ errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
 
 _TEMPLATE_COVR_FOR_PLOT = """
-covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (PLOT) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nerr} 0 {covr_plot_out}/
 1/
 /
@@ -165,7 +165,7 @@ covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
 
 _TEMPLATE_COVR_FOR_TEXT = """
-covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (DATA) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nerr} {covr_out}/
 1/
 /
@@ -573,6 +573,6 @@ def make_ace_thermal(filename, filename_thermal, temperatures=None,
         os.remove(fname.format(xsdir, temperature))
         
 if __name__ == "__main__":
-    make_ace('../data/tape20', temperatures=[300], ace='ace', xsdir='xsdir', pendf=None,
+    make_ace('../data/e71/tape20', temperatures=[300], ace='ace', xsdir='xsdir', pendf=None,
                  error=0.001, broadr=True, heatr=False, purr=False, acer=False, errorr=True, **{'input_filename': '../data/cov_w184.i'})
     
