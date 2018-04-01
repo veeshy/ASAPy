@@ -358,7 +358,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     # plot the base again so it appears on top
     ax.loglog(e * 1e6, st, linestyle='-.', color='k')
 
-    ax.legend(['Base', '(all others) Samples'])
+    ax.legend(['Actual', 'Samples'])
 
     ax.set_xlabel('Energy (Ev)')
     ax.set_ylabel('Cross Section (b)')
