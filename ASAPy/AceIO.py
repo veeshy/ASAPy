@@ -28,6 +28,7 @@ class AceEditor:
         self.all_mts = self.table.reactions.keys()
         # store the original sigma so it will be easy to retrieve it later
         self.original_sigma = {}
+        self.adjusted_mts = set()
 
     def get_sigma(self, mt):
         """
@@ -64,6 +65,8 @@ class AceEditor:
 
         self.table.find_reaction(mt).sigma = sigma
 
+        self.adjusted_mts.add(mt)
+
 
     def apply_sum_rules(self):
         """
@@ -86,6 +89,10 @@ class AceEditor:
         # potential for round-off error but each mt is summed indvidually so order does not matter.
         # if a sum mt does not exist, nothing happens
 
+        # considered redundant, may not need to adjust this if your program does not use it
+        # 4, 27, 101, 3, 4, 1
+
+        # mt_4 particularly does not define xsec on the union energy grid so summing it is non-trivial
         mt_4 = list(range(50, 92))
         mt_16 = list(range(875, 892))
         mt_18 = [19, 20, 21, 38]
@@ -113,15 +120,24 @@ class AceEditor:
             if sum_mt in self.all_mts:
                 sum_mts_present = self._check_if_mts_present(mts_in_sum)
                 if sum_mts_present:
-                        # re-write this mt with the constituent mts summed
-                        sigmas = np.array([self.get_sigma(mt) for mt in sum_mts_present])
-                        # sum all rows together
-                        new_sum = sigmas.sum(axis=0)
-                        self.set_sigma(sum_mt, new_sum)
-                        print("Adjusting {0} due to ENDF sum rules".format(sum_mt))
+                        # check if MT was adjusted before re-summing
+                        mt_adjusted_check = self._check_if_mts_present(self.adjusted_mts, compare_to=sum_mts_present)
+
+                        if mt_adjusted_check:
+                            # re-write this mt with the constituent mts summed
+                            sigmas = np.array([self.get_sigma(mt) for mt in sum_mts_present])
+                            # sum all rows together
+                            try:
+                                new_sum = sigmas.sum(axis=0)
+                            except ValueError:
+                                raise ValueError("Could not sum the xsec's in mt={0}. Note: MTs 1, 3, 4, 27, 101 are "
+                                                 "considered redundant, perhaps you don't need to apply the sum rule.\n\n"
+                                                 "MTs in this sum that are in this ACE file:\n{1}".format(sum_mt, sum_mts_present))
+                            self.set_sigma(sum_mt, new_sum)
+                            print("Adjusting {0} due to ENDF sum rules".format(sum_mt))
 
 
-    def _check_if_mts_present(self, mt_list):
+    def _check_if_mts_present(self, mt_list, compare_to=None):
         """
         Find what elements of mt_list are in self.all_mts
         Parameters
@@ -133,11 +149,15 @@ class AceEditor:
         -------
         list
             List of mt's present
+        list
+            List to check if mt's present in
 
         """
+        if compare_to is None:
+            compare_to = self.all_mts
 
         search_set = set(mt_list)
-        search_in_set = set(self.all_mts)
+        search_in_set = set(compare_to)
 
         return list(search_in_set.intersection(search_set))
 
@@ -240,5 +260,10 @@ class WriteAce:
 if __name__ == "__main__":
 
     # read then write the ace file for testing (should be the same)
-    wa = WriteAce('/Users/veeshy/MCNP6/MCNP_DATA/xdata/endf71x/W/74184.710nc')
-    wa.write_ace('/Users/veeshy/MCNP6/MCNP_DATA/xdata/endf71x/W/test_74184.710nc')
+    #wa = WriteAce('/Users/veeshy/MCNP6/MCNP_DATA/xdata/endf71x/W/74184.710nc')
+    #wa.write_ace('/Users/veeshy/MCNP6/MCNP_DATA/xdata/endf71x/W/test_74184.710nc')
+
+
+    wa = AceEditor('~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc')
+    wa.adjusted_mts.add(51)
+    wa.apply_sum_rules()
