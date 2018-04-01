@@ -311,7 +311,7 @@ def get_mt_from_ace(ace_file, zaid, mt):
 
     return e, st
 
-def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zaid_2=None, mt_2=None):
+def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zaid_2=None, mt_2=None, output_base=''):
     """
     Plots diag of cov, a few xsecs, and full corr matrix of the sampled data
     Parameters
@@ -323,10 +323,8 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     sample_df_full_vals
     zaid_2
     mt_2
-
-    Returns
-    -------
-
+    output_base : str
+        Base folder to output at
     """
     # plot the cov
     xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
@@ -337,22 +335,25 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     ax.legend()
     ax.set_xlabel("Energy (eV)")
     ax.set_ylabel("Covariance")
-    plt.savefig("{0}_{1}_sampled_cov.eps".format(zaid, mt), bbox_inches='tight')
+    plt.savefig("{2}{3}{0}_{1}_sampled_cov.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
 
     # Plot some xsec
     e, st = get_mt_from_ace(ace_file, zaid, mt)
 
     fig, ax = plt.subplots()
+
+    # ensure we don't try to plot too many samples
     num_xsec = 20
-    # ensure we don't try to plot too many
-    if num_xsec > len(xsec):
-        num_xsec = len(xsec)
+
+    # if less than num_xsec samples, plot all of them
+    if num_xsec > xsec.shape[1]:
+        num_xsec = xsec.shape[1]
 
     # plot the base x-sec too
     ax.loglog(e * 1e6, st, linestyle='-.', color='k')
 
     for i in range(num_xsec):
-        ax.loglog(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[i],
+        ax.loglog(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i],
                                                     min_e=xsec['e low'].min() - 1) * st, label=i)
     # plot the base again so it appears on top
     ax.loglog(e * 1e6, st, linestyle='-.', color='k')
@@ -362,7 +363,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     ax.set_xlabel('Energy (Ev)')
     ax.set_ylabel('Cross Section (b)')
 
-    plt.savefig("{0}_{1}_few_sampled_xsec.eps".format(zaid, mt), bbox_inches='tight')
+    plt.savefig("{2}{3}{0}_{1}_few_sampled_xsec.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
 
     # Plot the corr matrix
     fig, ax = plt.subplots(ncols=2, figsize=(8, 6))
@@ -379,7 +380,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     ax[1].set_ylabel('Group')
 
     fig.tight_layout()
-    plt.savefig("{0}_{1}_sampled_corr_compare.eps".format(zaid, mt), bbox_inches='tight')
+    plt.savefig("{2}{3}{0}_{1}_sampled_corr_compare.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
 
     # plot the xsec + the std_dev
     fig = plt.figure(figsize=(6, 4))
@@ -396,7 +397,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     ax.set_xlabel('Energy (eV)')
     ax.set_ylabel('Relative Dev.')
 
-    plt.savefig("{0}_{1}_base_xsec_with_std.eps".format(zaid, mt), bbox_inches='tight')
+    plt.savefig("{2}{3}{0}_{1}_base_xsec_with_std.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
 
 
 def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='xsec_sampled_{0}', zaid_2=None, mt_2=None):
@@ -428,7 +429,12 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
         w.replace_array(original_sigma, ae.get_sigma(102))
         w.write_ace(output_formatter.format(idx))
 
-    sample_df.to_csv('{0}.csv'.format(output_formatter.format('samples')))
+    # add in e groups then print all relative data and the base xsec
+    sample_df_rel.insert(0, 'e low', xsec['e low'])
+    sample_df_rel.insert(1, 'e high', xsec['e high'])
+    sample_df_rel.insert(2, 'xsec', xsec['x-sec(1)'])
+    sample_df_rel.insert(3, 'std', xsec['rel.s.d.(1)'])
+    sample_df_rel.to_csv('{0}.csv'.format(output_formatter.format('samples')))
 
 
 if __name__ == "__main__":
@@ -437,12 +443,12 @@ if __name__ == "__main__":
     store_name = '../scale_cov_252.h5'
     with pd.HDFStore(store_name, 'r') as h:
 
-        ace_file = '~/local/MCNP6/MCNP_DATA/xdata/endf71x/C/6000.710nc'
-        zaid = 6000
-        mt = 102
+        ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
+        zaid = 92235
+        mt = 18
 
-        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 500)
+        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 1000)
 
-        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full)
+        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base='../u235_fis/')
 
-        write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='/home/user/projects/ASAPy/c/c__{0}')
+        write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='../u235_fis/u_{0}')
