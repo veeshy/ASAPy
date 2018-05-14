@@ -386,7 +386,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     plot_xsec(ace_file, h, zaid, mt, output_base)
 
 
-def plot_xsec(ace_file, h, zaid, mt, output_base='./'):
+def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False):
     """
     Plots xsec from ACE file and rel deviation from error store for ZAID's mt
 
@@ -407,7 +407,7 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./'):
     xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid, mt)
     e, st = get_mt_from_ace(ace_file, zaid, mt)
     fig = plt.figure(figsize=(6, 4))
-    gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
+    gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1.3])
     ax = fig.add_subplot(gs[0])
     ax.loglog(e * 1e6, st)
     ax.grid(alpha=0.25)
@@ -425,18 +425,20 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./'):
     ax2.set_ylabel('% Rel. Dev.')
     ax2.grid(alpha=0.25)
 
-    # ensure this std dev has at least two decades plotted
-    # get the base 10 # that log would give back 1.05 -> log10(1.05) = 2.1189e-2, want min to be 10^-2
-    # high val, we want the next decade, all with proper scaling
-    low_val = xsec['rel.s.d.(1)'].min() * 100
-    high_val = xsec['rel.s.d.(1)'].max() * 100 * 10
-    low_val = 10**int("{0:e}".format(low_val).split('e')[-1])
-    high_val = 10**int("{0:e}".format(high_val).split('e')[-1])
+    if pad_rel_y_decades:
+        # ensure this std dev has at least two decades plotted
+        # get the base 10 # that log would give back 1.05 -> log10(1.05) = 2.1189e-2, want min to be 10^-2
+        # high val, we want the next decade, all with proper scaling
+        low_val = xsec['rel.s.d.(1)'].min() * 100
+        high_val = xsec['rel.s.d.(1)'].max() * 100 * 10
+        low_val = 10**int("{0:e}".format(low_val).split('e')[-1])
+        high_val = 10**int("{0:e}".format(high_val).split('e')[-1])
 
-    if low_val == high_val:
-        low_val = high_val / 10
+        if low_val == high_val:
+            low_val = high_val / 10
 
-    ax2.set_ylim([low_val, high_val])
+        ax2.set_ylim([low_val, high_val])
+
     ax2.yaxis.set_major_formatter(FormatStrFormatter('%g'))
 
     plt.savefig("{2}{3}{0}_{1}_base_xsec_with_std.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
