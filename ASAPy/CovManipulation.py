@@ -1,7 +1,7 @@
 import numpy as np
 import SALib.sample.latin as lhs
 from scipy.stats import multivariate_normal
-from scipy.stats.distributions import norm, lognorm
+from scipy.stats.distributions import norm, uniform
 
 def correlation_to_cov(std, corr):
     """
@@ -299,6 +299,8 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, dist
             mean = np.log(mean_values[i] / (1 + std_dev[i]**2/mean_values[i]**2)**0.5)
             sigma = (np.log(1 + std_dev[i]**2/mean_values[i]**2))**0.5
             zb[:, i] = np.exp(norm.ppf(zb[:, i], loc=mean, scale=sigma))
+        elif distro == 'uniform':
+            zb[:, i] = uniform.ppf(zb[:, i], loc=mean_values[i], scale=std_dev[i])
         else:
             raise Exception("Distro {0} not supported at the moment".format(distro))
 
