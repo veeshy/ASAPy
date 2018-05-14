@@ -6,6 +6,7 @@ import pandas as pd
 import scipy.linalg as LA
 from pyne import ace
 from matplotlib import gridspec
+from matplotlib.ticker import FormatStrFormatter
 #
 from ASAPy import CovManipulation
 from ASAPy import AceIO
@@ -382,22 +383,63 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     fig.tight_layout()
     plt.savefig("{2}{3}{0}_{1}_sampled_corr_compare.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
 
+    plot_xsec(ace_file, h, zaid, mt, output_base)
+
+
+def plot_xsec(ace_file, h, zaid, mt, output_base='./'):
+    """
+    Plots xsec from ACE file and rel deviation from error store for ZAID's mt
+
+    Parameters
+    ----------
+    ace_file
+    h
+    zaid
+    mt
+    output_base : str
+        Base path to save plot to
+
+    Returns
+    -------
+
+    """
     # plot the xsec + the std_dev
+    xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid, mt)
+    e, st = get_mt_from_ace(ace_file, zaid, mt)
     fig = plt.figure(figsize=(6, 4))
     gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
-
     ax = fig.add_subplot(gs[0])
     ax.loglog(e * 1e6, st)
-    ax.get_xaxis().set_visible(False)
+    ax.grid(alpha=0.25)
+    # turn off the x labels w/o turning off the grid x
+    for tic in ax.xaxis.get_major_ticks():
+        tic.tick1On = tic.tick2On = False
+        tic.label1On = tic.label2On = False
     ax.set_ylabel('Cross-Section (b)')
 
-    ax = fig.add_subplot(gs[1], sharex=ax)  # the above ax
-    ax.plot(xsec['e high'], xsec['rel.s.d.(1)'], drawstyle='steps-mid')
-    ax.set_xscale('log')
-    ax.set_xlabel('Energy (eV)')
-    ax.set_ylabel('Relative Dev.')
+    # second plot (rel dev %)
+    ax2 = fig.add_subplot(gs[1], sharex=ax)  # the above ax
+    ax2.loglog(xsec['e high'], xsec['rel.s.d.(1)'] * 100, drawstyle='steps-mid')
 
-    plt.savefig("{2}{3}{0}_{1}_base_xsec_with_std.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
+    ax2.set_xlabel('Energy (eV)')
+    ax2.set_ylabel('% Rel. Dev.')
+    ax2.grid(alpha=0.25)
+
+    # ensure this std dev has at least two decades plotted
+    # get the base 10 # that log would give back 1.05 -> log10(1.05) = 2.1189e-2, want min to be 10^-2
+    # high val, we want the next decade, all with proper scaling
+    low_val = xsec['rel.s.d.(1)'].min() * 100
+    high_val = xsec['rel.s.d.(1)'].max() * 100 * 10
+    low_val = 10**int("{0:e}".format(low_val).split('e')[-1])
+    high_val = 10**int("{0:e}".format(high_val).split('e')[-1])
+
+    if low_val == high_val:
+        low_val = high_val / 10
+
+    ax2.set_ylim([low_val, high_val])
+    ax2.yaxis.set_major_formatter(FormatStrFormatter('%g'))
+
+    plt.savefig("{2}{3}{0}_{1}_base_xsec_with_std.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
 
 
 def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='xsec_sampled_{0}', zaid_2=None, mt_2=None):
@@ -447,8 +489,12 @@ if __name__ == "__main__":
         zaid = 92235
         mt = 18
 
-        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 1000)
+        # sample_df, sample_df_full = sample_xsec(h, mt, zaid, 1000)
+        #
+        # plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base='../u235_fis/')
+        #
+        # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='../u235_fis/u_{0}')
+        #
+        #
 
-        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base='../u235_fis/')
-
-        write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='../u235_fis/u_{0}')
+        plot_xsec(ace_file, h, zaid, mt, output_base='./')
