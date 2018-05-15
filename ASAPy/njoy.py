@@ -171,8 +171,8 @@ covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (PLOT) %%%%%%%%%%%%%%%%%%%%%%%%
 _TEMPLATE_COVR_FOR_TEXT = """
 covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (DATA) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nerr} {covr_out}/
-1/
-/
+4/
+corr/
 /
 {mat}/
 """
