@@ -161,7 +161,7 @@ covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (PLOT) %%%%%%%%%%%%%%%%%%%%%%%%
 /
 1 2/
 {mat} 1 {mat} 1/
-{mat} 102 {mat} 102/
+{mat} 18 {mat} 18/
 """
 
 _TEMPLATE_COVR_FOR_TEXT = """
@@ -421,18 +421,6 @@ def make_ace(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=None,
                     if mass_first_digit <= 2:
                         text = text[:3] + str(mass_first_digit + 4) + text[4:]
 
-                # Concatenate into destination ACE file
-                ace_file.write(text)
-
-                # Concatenate into destination xsdir file
-                text = open(fname.format(xsdir, temperature), 'r').read()
-                xsdir_file.write(text)
-
-        # Remove ACE/xsdir files for each temperature
-        for temperature in temperatures:
-            os.remove(fname.format(ace, temperature))
-            os.remove(fname.format(xsdir, temperature))
-
 
 def make_ace_thermal(filename, filename_thermal, temperatures=None,
                      ace='ace', xsdir='xsdir', error=0.001, **kwargs):
@@ -557,22 +545,8 @@ def make_ace_thermal(filename, filename_thermal, temperatures=None,
         tapeout[ndir] = fname.format(xsdir, temperature)
     commands += 'stop\n'
     run(commands, tapein, tapeout, **kwargs)
-
-    with open(ace, 'w') as ace_file, open(xsdir, 'w') as xsdir_file:
-        # Concatenate ACE and xsdir files together
-        for temperature in temperatures:
-            text = open(fname.format(ace, temperature), 'r').read()
-            ace_file.write(text)
-
-            text = open(fname.format(xsdir, temperature), 'r').read()
-            xsdir_file.write(text)
-
-    # Remove ACE/xsdir files for each temperature
-    for temperature in temperatures:
-        os.remove(fname.format(ace, temperature))
-        os.remove(fname.format(xsdir, temperature))
         
 if __name__ == "__main__":
-    make_ace('../data/e71/tape20', temperatures=[300], ace='ace', xsdir='xsdir', pendf=None,
-                 error=0.001, broadr=True, heatr=False, purr=False, acer=False, errorr=True, **{'input_filename': '../data/cov_w184.i'})
+    make_ace('../data/e8/tape20', temperatures=[300], ace='ace', xsdir='xsdir', pendf=None,
+                 error=0.001, broadr=True, heatr=False, purr=False, acer=False, errorr=True, **{'input_filename': '../data/cov_u235.i', 'stdout': True})
     
