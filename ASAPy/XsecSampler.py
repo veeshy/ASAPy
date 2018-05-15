@@ -50,7 +50,16 @@ class XsecSampler:
 
         # load the cov and std_dev from the store
         std_dev_df = h['{0}/{1}/{2}/{3}/std_dev'.format(zaid_1, mt_1, zaid_2, mt_2)]
-        corr_df = h['{0}/{1}/{2}/{3}/corr'.format(zaid_1, mt_1, zaid_2, mt_2)] / 1000
+        corr_df = h['{0}/{1}/{2}/{3}/corr'.format(zaid_1, mt_1, zaid_2, mt_2)]
+        # ensure diagonals and matrix normalized to 1.0
+        corr_df = corr_df / corr_df.loc[1, 1]
+
+        # make sure e low and e high are in the correct order
+        if std_dev_df['e low'][1] > std_dev_df['e high'][1]:
+            # swap e low and e high values
+            temp_e = std_dev_df['e low'].values
+            std_dev_df['e low'] = std_dev_df['e high']
+            std_dev_df['e high'] = temp_e
 
         return std_dev_df, corr_df
 
@@ -499,4 +508,7 @@ if __name__ == "__main__":
         #
         #
 
+        # ace_file = '/Users/veeshy/MCNP6/MCNP_DATA/xdata/endf71x/W/74180.710nc'
+        # zaid = 74184
+        # mt = 102
         plot_xsec(ace_file, h, zaid, mt, output_base='./')
