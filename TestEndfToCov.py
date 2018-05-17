@@ -1,6 +1,10 @@
 from unittest import TestCase
 from ASAPy import EndfToCov
 import unittest
+import shutil
+import os
+import difflib
+
 
 class TestReadBoxer2Matrix(TestCase):
     @classmethod
@@ -21,6 +25,59 @@ class TestReadBoxer2Matrix(TestCase):
     def testCov(self):
         _,_,std_dev,cov = self.read_boxer_out_matrix.get_block_data()
         self.assertEqual(len(cov), 238)
+
+class TestRunCoverChain(TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.test_dir = '../test_data/run_cover_chain_test_out/'
+
+    def testChain(self):
+        shutil.rmtree(self.test_dir)
+        os.makedirs(self.test_dir)
+        EndfToCov.run_cover_chain("../test_data/n_0125_1-H-1.dat", [2, 102], [300, 2400], output_dir=self.test_dir)
+
+        # check each file against gold
+
+        files = ["covr_2400.txt_102_matrix.txt", "testing_chain.txtboxer.txt", "covr_2400.txt_2_matrix.txt",
+                 "covr_300.txt_102_matrix.txt", "covr_300.txt_2_matrix.txt", "viewr_2400.eps", "covr_2400.txt",
+                 "viewr_300.eps", "covr_300.txt", "testing_chain.txt"]
+
+        gold_dir = "../test_data/gold_njoy_boxer_chain_test_out/"
+
+        for file in files:
+            with open(os.path.join(gold_dir, file)) as g:
+                with open(os.path.join(self.test_dir, file)) as t:
+                    gold_lines = ' '.join(g.readlines())
+                    test_lines = ' '.join(t.readlines())
+                    self.assertMultiLineEqual(gold_lines, test_lines, msg="File: {0}".format(file))
+
+            os.remove(os.path.join(self.test_dir, file))
+
+    def tearDown(self):
+        try:
+            os.rmdir(self.test_dir)
+        except:
+            print("Could not remove ../test_data/run_cover_chain_test_out/ directory because it is not empty.")
+
+    def assertMultiLineEqual(self, first, second, msg=None):
+        """Assert that two multi-line strings are equal.
+
+        If they aren't, show a nice diff.
+
+        """
+        self.assertTrue(isinstance(first, str),
+                        'First argument is not a string')
+        self.assertTrue(isinstance(second, str),
+                        'Second argument is not a string')
+
+        if first != second:
+            message = ''.join(difflib.ndiff(first.splitlines(True),
+                                            second.splitlines(True)))
+            if msg:
+                message += " : " + msg
+            self.fail("Multi-line strings are unequal:\n" + message)
+
 
 if __name__ == "__main__":
     unittest.main()
