@@ -13,6 +13,8 @@ from subprocess import Popen, PIPE, STDOUT, CalledProcessError
 import sys
 import tempfile
 
+import numpy as np
+
 from ASAPy import AsapyCovStorage
 from ASAPy import njoy
 
@@ -83,11 +85,129 @@ def run(commands, tapein, tapeout, input_filename=None, stdout=False,
                 shutil.move(tmpfilename, filename)
 
 
+#
+# njoy.make_njoy_run('../data/e8/tape20', temperatures=[300],
+#                    broadr=True, heatr=False, purr=False, acer=False, errorr=True,
+#                    cov_energy_groups=njoy.energy_groups_44,
+#                    **{'input_filename': '../data/cov_u235.i', 'stdout': True})
 
-njoy.make_njoy_run('../data/e8/tape20', temperatures=[300],
-                   broadr=True, heatr=False, purr=False, acer=False, errorr=True,
-                   cov_energy_groups=njoy.energy_groups_44,
-                   **{'input_filename': '../data/cov_u235.i', 'stdout': True})
+class read_boxer_out_matrix:
+    """
+    Reads file, the output of boxer2matrix. File format is such that 3 blocks of data exist
+
+    Parameters
+    ----------
+    file : str
+        Path to boxer2matrix file
+    """
+
+    def __init__(self, file):
+
+        with open(file, 'r') as f:
+            self.lines = f.readlines()
+
+        self.block_line_nums = self._find_block_line_nums()
+
+    def _find_block_line_nums(self):
+        """
+        Finds the block line #s where data begins
+
+        1 for the group bounds, another for the xsec, and a third for the cov.
+
+        0 more header info for groups
+        lines of data
+
+        1 more header info for xsec
+        lines of data
+
+        2 more header info for std dev
+        lines of data
+
+        3 more header info for cov
+        lines of data
+
+        Returns
+        -------
+        list
+            Line numbers
+        """
+        # find the line start numbers of the data blocks
+        block_start_line_nums = []
+        for line_num, line in enumerate(self.lines):
+            l = line.split()
+            if l:
+                # the only ints as the first block of char are ints, so if we find an int we know we have a start of a block
+                try:
+                    int(l[0])
+                    block_start_line_nums.append(line_num)
+                except ValueError:
+                    pass
+
+        if not block_start_line_nums:
+            raise Exception("Did not find any block line numbers.")
+
+        return block_start_line_nums
+
+    def get_block_data(self):
+        """
+
+        Returns
+        -------
+        np.array
+            group bounds (eV)
+        np.array
+            xsec
+        np.array
+            std dev
+        np.array
+            correlation matrix
+
+        """
+
+        group_bounds = self._block_lines_to_array(self.block_line_nums[0] + 1, self.block_line_nums[1])
+        xsec = self._block_lines_to_array(self.block_line_nums[1] + 1, self.block_line_nums[2])
+        std_dev = self._block_lines_to_array(self.block_line_nums[2] + 1, self.block_line_nums[3])
+        cov = self._block_lines_to_array(self.block_line_nums[3] + 1, len(self.lines))
+
+        number_of_xsec = len(xsec)
+        cov = np.reshape(cov, [number_of_xsec, number_of_xsec])
+
+        return group_bounds, xsec, std_dev, cov
+
+    def _block_lines_to_array(self, line_num_start, line_num_end):
+        """
+        Converts a block of lines into an np.array
+        Parameters
+        ----------
+        line_num_start : the first line to read
+        line_num_end : the last line to read (this line # is the end point of the index so it is NOT read
+
+        Returns
+        -------
+        np.array
+
+        """
+        block_lines = self.lines[line_num_start:line_num_end]
+        block_lines_no_newlines = []
+
+        # need to sanitize this against very long values since this is a fixed len format
+        for line in block_lines:
+            replace_white_space_with_zero = line.replace(' ', '0')
+            removed_new_lines = ''.join(replace_white_space_with_zero.split())
+            block_lines_no_newlines.append(removed_new_lines)
+
+        block_lines_str = ''.join(block_lines_no_newlines)
+
+        string_width = 10
+        # split on every 10 chars
+        block_lines_str = [block_lines_str[i:i + string_width] for i in range(0, len(block_lines_str), string_width)]
+        # rejoin string, leaving a space so that numpy can read it nicely
+        block_lines_str = ' '.join(block_lines_str)
+
+        values = np.fromstring(block_lines_str, sep=' ')
+
+        return values
+
 
 # need to:
 #  copy tape24 (the njoy cover output) to fort.20 (the boxer input)
