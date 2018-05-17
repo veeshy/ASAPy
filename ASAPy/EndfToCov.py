@@ -5,12 +5,9 @@ converted to matrix format then parsed into a ASAPy covariance store.
 The result can be appended to an existing store or made into a new store.
 """
 
-from collections import namedtuple
-from io import StringIO
 import os
 import shutil
 from subprocess import Popen, PIPE, STDOUT, CalledProcessError
-import sys
 import tempfile
 
 import numpy as np
@@ -18,36 +15,43 @@ import numpy as np
 from ASAPy import AsapyCovStorage
 from ASAPy import njoy
 
+_BOXER_TEMPLATE = """0,{mat},{mt},{mat},{mt}
+1,{mat},{mt},{mat},{mt}
+2,{mat},{mt},{mat},{mt}
+4,{mat},{mt},{mat},{mt}
+0,0
+"""
 
-def run(commands, tapein, tapeout, input_filename=None, stdout=False,
-        njoy_exec='../boxer2mat/boxer2mat'):
-    """Run NJOY with given commands
+def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename=None, stdout=True,
+                    njoy_exec='../boxer2mat/boxer2mat', boxer_exec='../boxer2mat/boxer2mat'):
+    """Run NJOY to create a cov matrix in easily readable format by
+    converting the BOXER output to matrix form
 
     Parameters
     ----------
-    commands : str
-        Input commands for NJOY
+    njoy_commands : str
+        Input njoy_commands for NJOY
     tapein : dict
         Dictionary mapping tape numbers to paths for any input files
     tapeout : dict
         Dictionary mapping tape numbers to paths for any output files
+    mts : list
+        List of MT numbers to get cov info for
     input_filename : str, optional
-        File name to write out NJOY input commands
+        File name to write out NJOY input njoy_commands
     stdout : bool, optional
         Whether to display output when running NJOY
     njoy_exec : str, optional
         Path to NJOY executable
+    base_file_name : str, optional
+        The base file that the executable uses (likely tape or fort.)
 
     Raises
     ------
     subprocess.CalledProcessError
-        If the NJOY process returns with a non-zero status
+        If the executable process returns with a non-zero status
 
     """
-
-    if input_filename is not None:
-        with open(input_filename, 'w') as f:
-            f.write(commands)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Copy evaluations to appropriates 'tapes'
@@ -55,34 +59,81 @@ def run(commands, tapein, tapeout, input_filename=None, stdout=False,
             tmpfilename = os.path.join(tmpdir, 'tape{}'.format(tape_num))
             shutil.copy(filename, tmpfilename)
 
-        # Start up NJOY process
-        njoy = Popen([njoy_exec], cwd=tmpdir, stdin=PIPE, stdout=PIPE,
-                     stderr=STDOUT, universal_newlines=True)
+        run_program(njoy_commands, njoy_exec, stdout, tmpdir, input_filename)
 
-        njoy.stdin.write(commands)
-        njoy.stdin.flush()
-        lines = []
-        while True:
-            # If process is finished, break loop
-            line = njoy.stdout.readline()
-            if not line and njoy.poll() is not None:
-                break
-
-            lines.append(line)
-            if stdout:
-                # If user requested output, print to screen
-                print(line, end='')
-
-        # Check for error
-        if njoy.returncode != 0:
-            raise CalledProcessError(njoy.returncode, njoy_exec,
-                                     ''.join(lines))
 
         # Copy output files back to original directory
         for tape_num, filename in tapeout.items():
             tmpfilename = os.path.join(tmpdir, 'tape{}'.format(tape_num))
             if os.path.isfile(tmpfilename):
-                shutil.move(tmpfilename, filename)
+                shutil.copy(tmpfilename, filename)
+
+        # Convert the cov boxer out to matrix form
+        # for loop since several temps might be evaluated
+        for tape_num, file_name in cover_tapes.items():
+            # the nin for boxer2matrix
+            tempnjoycovtape = os.path.join(tmpdir, 'tape{}'.format(tape_num))
+            tmpboxerfilename_in = os.path.join(tmpdir, 'fort.20')
+            tmpboxerfilename_out = os.path.join(tmpdir, 'fort.21')
+            shutil.move(tempnjoycovtape, tmpboxerfilename_in)
+            # use the same input multiple times for diff MTs
+            for mt in mts:
+                # run boxer
+                boxer_commands = _BOXER_TEMPLATE.format(mat=mat_num, mt=mt)
+                run_program(boxer_commands, boxer_exec, stdout, tmpdir, input_filename + "boxer")
+                # save the output locally
+                shutil.move(tmpboxerfilename_out, file_name + "_" + str(mt) + "_matrix")
+
+
+def run_program(commands, executable_path, stdout, run_dir, write_input_file=None):
+    """
+    Run
+    Parameters
+    ----------
+    commands : str
+        Input commands for executable
+    executable_path : str
+        Path to executable
+    stdout : bool, optional
+        Whether to display output when running NJOY
+    run_dir : str
+        Directory to run in
+    write_input_file : str, optional
+        File name to write out input commands
+
+    Raises
+    ------
+    subprocess.CalledProcessError
+        If the executable process returns with a non-zero status
+
+    """
+
+    if write_input_file is not None:
+        with open(write_input_file, 'a') as f:
+            f.write(commands)
+            f.write("\n")
+
+
+    # Start up process
+    executable = Popen([executable_path], cwd=run_dir, stdin=PIPE, stdout=PIPE,
+                 stderr=STDOUT, universal_newlines=True)
+    executable.stdin.write(commands)
+    executable.stdin.flush()
+    lines = []
+    while True:
+        # If process is finished, break loop
+        line = executable.stdout.readline()
+        if not line and executable.poll() is not None:
+            break
+
+        lines.append(line)
+        if stdout:
+            # If user requested output, print to screen
+            print(line, end='')
+    # Check for error
+    if executable.returncode != 0:
+        raise CalledProcessError(executable.returncode, executable_path,
+                                 ''.join(lines))
 
 
 #
@@ -208,17 +259,40 @@ class read_boxer_out_matrix:
 
         return values
 
+def run_cover_chain(endf_file, mts, temperatures):
+    """
+    Creates cov matrix and plots for mts and temperatures for the end file
+    Parameters
+    ----------
+    endf_file
+    mts
+    temperatures
 
-# need to:
-#  copy tape24 (the njoy cover output) to fort.20 (the boxer input)
-#  make sure we know the NJOY mat # (endf has that, in njoy.py I think)
-#  for each mat/mt cov we want:
-#   create an input that makes the group bounds, xsec, std_dev, and correlation
-#   run boxer2mat
-#   mv the output (tape.21) to mat_mt_mat_mt.mat
+    Returns
+    -------
+
+    """
+
+    if not isinstance(mts, list):
+        mts = [mts]
+    if not isinstance(temperatures, list):
+        temperatures = [temperatures]
+    mat_num = njoy.get_mat_from_endf(endf_file)
+    njoy_commands, tapein, tapeout = njoy.make_njoy_run(endf_file, temperatures=temperatures, pendf=None, error=0.001,
+                                                        covr_plot_mts=mts,
+                                                        broadr=True, heatr=False, purr=False, acer=False, errorr=True)
+
+    # we know the order of tape out {covout1, plotout1,, covout2, plotout2, ...}, just get the cov outs
+    cover_tapes = {item: value for item, value in list(tapeout.items())[0::2]}
+
+    _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename="testing_chain.txt",
+                     stdout=True, njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy', boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat')
+
+if __name__ == "__main__":
+    run_cover_chain("n_0125_1-H-1.dat", [2, 102])
 
 # for each mat/mt cov:
 #   read the tape.21 outputs (mat_mt_mat_mt.mat)
-#   parse the group bounds, xsec, std_dev, correlation matrix
+#   parse the group bounds, xsec, std_dev, correlation matrix  done!
 #   create stddev and corr df
 #   store these

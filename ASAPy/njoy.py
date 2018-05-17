@@ -35,6 +35,7 @@ import shutil
 from subprocess import Popen, PIPE, STDOUT, CalledProcessError
 import sys
 import tempfile
+from collections import OrderedDict
 
 from ASAPy import endf
 
@@ -158,15 +159,32 @@ errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {cov_group_bounds}/
 """
 
-_TEMPLATE_COVR_FOR_PLOT = """
+def _TEMPLATE_COVR_FOR_PLOT(mts):
+    """
+    Expands template to include variable number of mts
+    Parameters
+    ----------
+    mts : list
+        List of MTs to plot
+
+    Returns
+    -------
+    string
+        Template for covr plot out
+    """
+
+    s = """
 covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (PLOT) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-{nerr} 0 {covr_plot_out}/
+{{nerr}} 0 {{covr_plot_out}}/
 1/
 /
-1 2/
-{mat} 1 {mat} 1/
-{mat} 18 {mat} 18/
-"""
+1 {n_mats}/
+""".format(n_mats=len(mts))
+
+    for mt in mts:
+        s += "{{mat}} {mt} {{mat}} {mt}/\n".format(mt=mt)
+
+    return s
 
 _TEMPLATE_COVR_FOR_TEXT = """
 covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (DATA) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -286,7 +304,7 @@ def make_pendf(filename, pendf='pendf', error=0.001, stdout=False):
 
 def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=None,
                   error=0.001, broadr=True, heatr=True, purr=True, acer=True, errorr=True,
-                  cov_energy_groups=None, **kwargs):
+                  cov_energy_groups=None, run=False, covr_plot_mts=None, **kwargs):
     """Generate incident neutron ACE file from an ENDF file
 
     Parameters
@@ -316,6 +334,8 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
         Indicating whether to generate covariances when running NJOY
     cov_energy_groups : list
         Defaults to 239 groups
+    run : bool, optional
+        Run njoy
     **kwargs
         Keyword arguments passed to :func:`openmc.data.njoy.run`
 
@@ -323,6 +343,15 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
     ------
     subprocess.CalledProcessError
         If the NJOY process returns with a non-zero status
+
+    Returns
+    -------
+    str
+        commands to run njoy
+    dict
+        map of tape in to filenames
+    dict
+        map of tape out to filenames
 
     """
     ev = endf.Evaluation(filename)
@@ -341,8 +370,9 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
     commands = ""
 
     nendf, npendf = 20, 21
-    tapein = {nendf: filename}
-    tapeout = {}
+    tapein = OrderedDict()
+    tapein[nendf] = filename
+    tapeout = OrderedDict()
     if pendf is not None:
         tapeout[npendf] = pendf
 
@@ -355,12 +385,14 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
         nbroadr = nlast + 1
         commands += _TEMPLATE_BROADR
         nlast = nbroadr
-        
+
     if errorr:
         if cov_energy_groups is None:
             cov_energy_groups = energy_groups_239
 
         cov_ngroups = len(cov_energy_groups) - 1
+
+        fname = "{}_{:.1f}"
         for i, temperature in enumerate(temperatures):
             nerr_in = nbroadr  # PENDF tape that was broadened to right temp
             nerr = nlast + 1
@@ -372,17 +404,20 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             nlast += 1
 
             covr_out = nlast + 1
+            tapeout[covr_out] = fname.format("covr", temperature)
             nlast += 1
             commands += _TEMPLATE_COVR_FOR_TEXT.format(**locals())
 
-            covr_plot_out = nlast + 1   # needed as input to viewr
-            nlast += 1
+            if covr_plot_mts:
+                covr_plot_out = nlast + 1   # needed as input to viewr
+                nlast += 1
 
-            viewr_plot_out = nlast + 1
-            nlast += 1
+                viewr_plot_out = nlast + 1
+                tapeout[viewr_plot_out] = fname.format("viewr", temperature)
+                nlast += 1
 
-            commands += _TEMPLATE_COVR_FOR_PLOT.format(**locals())
-            commands += _TEMPLATE_VIEWR.format(**locals())
+                commands += _TEMPLATE_COVR_FOR_PLOT(covr_plot_mts).format(**locals())
+                commands += _TEMPLATE_VIEWR.format(**locals())
 
     # heatr
     if heatr:
@@ -415,20 +450,45 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             tapeout[nace] = fname.format(ace, temperature)
             tapeout[ndir] = fname.format(xsdir, temperature)
     commands += 'stop\n'
-    run(commands, tapein, tapeout, **kwargs)
+    if run:
+        run(commands, tapein, tapeout, **kwargs)
 
     if acer:
-        with open(ace, 'w') as ace_file, open(xsdir, 'w') as xsdir_file:
-            for temperature in temperatures:
-                # Get contents of ACE file
-                text = open(fname.format(ace, temperature), 'r').read()
+        if run:
+            with open(ace, 'w') as ace_file, open(xsdir, 'w') as xsdir_file:
+                for temperature in temperatures:
+                    # Get contents of ACE file
+                    text = open(fname.format(ace, temperature), 'r').read()
 
-                # If the target is metastable, make sure that ZAID in the ACE file reflects
-                # this by adding 400
-                if ev.target['isomeric_state'] > 0:
-                    mass_first_digit = int(text[3])
-                    if mass_first_digit <= 2:
-                        text = text[:3] + str(mass_first_digit + 4) + text[4:]
+                    # If the target is metastable, make sure that ZAID in the ACE file reflects
+                    # this by adding 400
+                    if ev.target['isomeric_state'] > 0:
+                        mass_first_digit = int(text[3])
+                        if mass_first_digit <= 2:
+                            text = text[:3] + str(mass_first_digit + 4) + text[4:]
+        else:
+            # see if the user should know to edit the acer file later
+            if ev.target['isomeric_state'] > 0:
+                print("Warning:ACER: You will need to adjust the ACER output because a "
+                      "metastable state is being ran. This means you must add 400 to the ZAID")
+
+    return commands, tapein, tapeout
+
+def get_mat_from_endf(filename):
+    """
+    Gets mat # from an ENDF file
+    Parameters
+    ----------
+    filename
+        The ENDF file
+
+    Returns
+    -------
+    int
+        The mat number
+    """
+    ev = endf.Evaluation(filename)
+    return ev.material
 
 
 def make_ace_thermal(filename, filename_thermal, temperatures=None,
@@ -558,4 +618,3 @@ def make_ace_thermal(filename, filename_thermal, temperatures=None,
 if __name__ == "__main__":
     make_njoy_run('../data/e8/tape20', temperatures=[300], ace='ace', xsdir='xsdir', pendf=None,
                   error=0.001, broadr=True, heatr=False, purr=False, acer=False, errorr=True, **{'input_filename': '../data/cov_u235.i', 'stdout': True})
-    
