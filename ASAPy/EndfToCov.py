@@ -23,7 +23,7 @@ _BOXER_TEMPLATE = """0,{mat},{mt},{mat},{mt}
 """
 
 def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename=None, stdout=True,
-                    njoy_exec='../boxer2mat/boxer2mat', boxer_exec='../boxer2mat/boxer2mat'):
+                    njoy_exec='../boxer2mat/boxer2mat', boxer_exec='../boxer2mat/boxer2mat', output_base_path='./'):
     """Run NJOY to create a cov matrix in easily readable format by
     converting the BOXER output to matrix form
 
@@ -59,14 +59,13 @@ def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, 
             tmpfilename = os.path.join(tmpdir, 'tape{}'.format(tape_num))
             shutil.copy(filename, tmpfilename)
 
-        run_program(njoy_commands, njoy_exec, stdout, tmpdir, input_filename)
-
+        run_program(njoy_commands, njoy_exec, stdout, tmpdir, os.path.join(output_base_path, input_filename))
 
         # Copy output files back to original directory
         for tape_num, filename in tapeout.items():
             tmpfilename = os.path.join(tmpdir, 'tape{}'.format(tape_num))
             if os.path.isfile(tmpfilename):
-                shutil.copy(tmpfilename, filename)
+                shutil.copy(tmpfilename, os.path.join(output_base_path, filename))
 
         # Convert the cov boxer out to matrix form
         # for loop since several temps might be evaluated
@@ -80,9 +79,9 @@ def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, 
             for mt in mts:
                 # run boxer
                 boxer_commands = _BOXER_TEMPLATE.format(mat=mat_num, mt=mt)
-                run_program(boxer_commands, boxer_exec, stdout, tmpdir, input_filename + "boxer")
+                run_program(boxer_commands, boxer_exec, stdout, tmpdir, os.path.join(output_base_path, input_filename + "boxer.txt"))
                 # save the output locally
-                shutil.move(tmpboxerfilename_out, file_name + "_" + str(mt) + "_matrix")
+                shutil.move(tmpboxerfilename_out, os.path.join(output_base_path, file_name + "_" + str(mt) + "_matrix.txt"))
 
 
 def run_program(commands, executable_path, stdout, run_dir, write_input_file=None):
@@ -113,13 +112,13 @@ def run_program(commands, executable_path, stdout, run_dir, write_input_file=Non
             f.write(commands)
             f.write("\n")
 
-
     # Start up process
     executable = Popen([executable_path], cwd=run_dir, stdin=PIPE, stdout=PIPE,
                  stderr=STDOUT, universal_newlines=True)
     executable.stdin.write(commands)
     executable.stdin.flush()
     lines = []
+
     while True:
         # If process is finished, break loop
         line = executable.stdout.readline()
@@ -135,12 +134,10 @@ def run_program(commands, executable_path, stdout, run_dir, write_input_file=Non
         raise CalledProcessError(executable.returncode, executable_path,
                                  ''.join(lines))
 
+    executable.stdin.close()
+    if stdout:
+        executable.stdout.close()
 
-#
-# njoy.make_njoy_run('../data/e8/tape20', temperatures=[300],
-#                    broadr=True, heatr=False, purr=False, acer=False, errorr=True,
-#                    cov_energy_groups=njoy.energy_groups_44,
-#                    **{'input_filename': '../data/cov_u235.i', 'stdout': True})
 
 class read_boxer_out_matrix:
     """
@@ -259,7 +256,7 @@ class read_boxer_out_matrix:
 
         return values
 
-def run_cover_chain(endf_file, mts, temperatures):
+def run_cover_chain(endf_file, mts, temperatures, output_dir='./'):
     """
     Creates cov matrix and plots for mts and temperatures for the end file
     Parameters
@@ -286,10 +283,11 @@ def run_cover_chain(endf_file, mts, temperatures):
     cover_tapes = {item: value for item, value in list(tapeout.items())[0::2]}
 
     _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename="testing_chain.txt",
-                     stdout=True, njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy', boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat')
+                     stdout=True, njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy',
+                     boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat', output_base_path=output_dir)
 
 if __name__ == "__main__":
-    run_cover_chain("n_0125_1-H-1.dat", [2, 102])
+    run_cover_chain("n_0125_1-H-1.dat", [2, 102], [300, 2400], output_dir='./run_cover_chain_test_out/')
 
 # for each mat/mt cov:
 #   read the tape.21 outputs (mat_mt_mat_mt.mat)

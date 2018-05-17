@@ -392,7 +392,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
 
         cov_ngroups = len(cov_energy_groups) - 1
 
-        fname = "{}_{:.1f}"
+        fname = "{}_{}"
         for i, temperature in enumerate(temperatures):
             nerr_in = nbroadr  # PENDF tape that was broadened to right temp
             nerr = nlast + 1
@@ -404,7 +404,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             nlast += 1
 
             covr_out = nlast + 1
-            tapeout[covr_out] = fname.format("covr", temperature)
+            tapeout[covr_out] = fname.format("covr", temperature) + ".txt"
             nlast += 1
             commands += _TEMPLATE_COVR_FOR_TEXT.format(**locals())
 
@@ -413,7 +413,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
                 nlast += 1
 
                 viewr_plot_out = nlast + 1
-                tapeout[viewr_plot_out] = fname.format("viewr", temperature)
+                tapeout[viewr_plot_out] = fname.format("viewr", temperature) + ".eps"
                 nlast += 1
 
                 commands += _TEMPLATE_COVR_FOR_PLOT(covr_plot_mts).format(**locals())

@@ -366,6 +366,8 @@ class Evaluation(object):
 
         self._read_header()
 
+        fh.close()
+
     def _read_header(self):
         file_obj = io.StringIO(self.section[1, 451])
 
