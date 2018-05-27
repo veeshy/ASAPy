@@ -30,6 +30,42 @@ class AceEditor:
         self.original_sigma = {}
         self.adjusted_mts = set()
 
+    def get_chi_distro(self, mt=18):
+        """
+        Gets the energy distribution pyne object from mt for further processing
+        Returns
+        -------
+        EnergyDistribution
+            A pyne object with methods:
+            cdf : ndarray
+                The CDF for the probability distribution of output energies
+            energy : ndarray
+                The energy range defined
+            energy_in : ndarray
+                The incident neutron energy
+            energy_out : ndarray
+                The out neutron energy
+            intt : array
+                ?
+            law : int
+                The ENDF LAW used to store the data (must be 4 here)
+            pdf : ndarray
+                The PDF for the probability distribution of output energies
+            pvalid : ndarray
+                ?
+        """
+        fission_present = self._check_if_mts_present([mt])
+        if fission_present:
+            fission_chi = self.table.reactions[mt].energy_dist
+            # only allow LAW=4
+            if fission_chi.law != 4:
+                raise ValueError("The fission MT={mt} chi is stored as non LAW=4 format. Only LAW 4 allowed, got: {law}".format(mt=mt, law=fission_chi.law))
+
+        else:
+            raise IndexError("No fission MT={mt} present on ace file {ace}".format(mt=mt, ace=self.ace_path))
+
+        return fission_chi
+
     def get_nu_distro(self):
         """
         Finds \chi_T table.
@@ -38,7 +74,7 @@ class AceEditor:
         AttributeError
             If the ACE file does ot contain nu_t_type
         TypeError
-            If the table is not "LAW 4: Continuous Tabular Distribution"
+            If the table is not stored as tabular (rather than polynomial)
         Returns
         -------
         np.array
@@ -54,8 +90,7 @@ class AceEditor:
 
         if self.table.nu_t_type != 'tabular':
             raise TypeError(
-                "Fission nu distribition is not stored in the LAW 4: Continuous "
-                "Tabular Distribution. ASAPy only works with LAW 4")
+                "Fission nu distribition is not stored in the tabular format (ASAPy does not support poly)")
 
         nu_t_e = self.table.nu_t_energy
         nu_t_value = self.table.nu_t_value

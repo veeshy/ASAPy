@@ -1,6 +1,7 @@
 from unittest import TestCase
 import unittest
 from ASAPy import AceIO
+import pyne
 
 class TestAceEditor(TestCase):
     @classmethod
@@ -35,6 +36,9 @@ class TestAceEditor(TestCase):
         #self.ace.set_sigma(102, self.ace.get_sigma(2)*2)
         #self.ace.apply_sum_rules()
 
+    def test_get_nu(self):
+        ef = self.ace.get_chi_distro()
+        self.assertIsInstance(ef, pyne.ace.EnergyDistribution)
 
     def test__check_if_mts_present(self):
         """
