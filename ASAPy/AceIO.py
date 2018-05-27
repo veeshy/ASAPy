@@ -30,6 +30,41 @@ class AceEditor:
         self.original_sigma = {}
         self.adjusted_mts = set()
 
+    def get_nu_distro(self):
+        """
+        Finds \chi_T table.
+        Raises
+        ------
+        AttributeError
+            If the ACE file does ot contain nu_t_type
+        TypeError
+            If the table is not "LAW 4: Continuous Tabular Distribution"
+        Returns
+        -------
+        np.array
+            Energies at which neutrons are emitted during fission
+        np.array
+            Total number of neutrons emitted per fission
+        """
+
+        try:
+            self.table.nu_t_type
+        except AttributeError:
+            raise AttributeError("Nu is not present on this ACE file. " + self.ace_path)
+
+        if self.table.nu_t_type != 'tabular':
+            raise TypeError(
+                "Fission nu distribition is not stored in the LAW 4: Continuous "
+                "Tabular Distribution. ASAPy only works with LAW 4")
+
+        nu_t_e = self.table.nu_t_energy
+        nu_t_value = self.table.nu_t_value
+
+
+        return nu_t_e, nu_t_value
+
+
+
     def get_sigma(self, mt):
         """
         Grabs sigma from the table
@@ -57,7 +92,7 @@ class AceEditor:
         """
 
         if len(sigma) != len(self.energy):
-            raise Exception('Length of sigma provided does not match energy bins got: {0}, needed: {1}'.format(len(sigma), len(self.energy)))
+            raise IndexError('Length of sigma provided does not match energy bins got: {0}, needed: {1}'.format(len(sigma), len(self.energy)))
 
         current_sigma = self.get_sigma(mt)
         if mt not in self.original_sigma.keys():
