@@ -6,7 +6,7 @@ import pyne
 class TestAceEditor(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.ace = AceIO.AceEditor('../test_data/92235.710nc')
+        cls.ace = AceIO.AceEditor('./test_data/92235.710nc')
 
     def test_get_nu_distro(self):
         [e, v] = self.ace.get_nu_distro()
