@@ -80,6 +80,9 @@ class AceEditor:
         """
         rx = self.table.find_reaction(mt)
 
+        if rx is None:
+            raise ValueError("MT {mt} not present in this ace file {ace}".format(mt=mt, ace=self.ace_path))
+
         return rx.sigma
 
     def set_sigma(self, mt, sigma):

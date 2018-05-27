@@ -26,6 +26,16 @@ class TestAceEditor(TestCase):
         self.assertAlmostEqual(v[99], 18.65279*2)
         self.assertEqual(self.ace.adjusted_mts, {2})
 
+    def test_non_existant_sigma(self):
+        self.assertRaises(ValueError, self.ace.get_sigma, 3)
+
+    def test_set_sum(self):
+        #TODO need to find a good test for this
+        pass
+        #self.ace.set_sigma(102, self.ace.get_sigma(2)*2)
+        #self.ace.apply_sum_rules()
+
+
     def test__check_if_mts_present(self):
         """
         Make sure all MTs are found correctly
