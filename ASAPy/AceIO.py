@@ -331,12 +331,4 @@ class WriteAce:
                 f.write('\n')
 
 if __name__ == "__main__":
-
-    # read then write the ace file for testing (should be the same)
-    #wa = WriteAce('/Users/veeshy/MCNP6/MCNP_DATA/xdata/endf71x/W/74184.710nc')
-    #wa.write_ace('/Users/veeshy/MCNP6/MCNP_DATA/xdata/endf71x/W/test_74184.710nc')
-
-
-    wa = AceEditor('~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc')
-    wa.adjusted_mts.add(51)
-    wa.apply_sum_rules()
+    pass
