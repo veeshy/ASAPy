@@ -132,6 +132,42 @@ acer / %%%%%%%%%%%%%%%%%%%%%%%% Write out in ACE format %%%%%%%%%%%%%%%%%%%%%%%%
 /
 """
 
+# TODO create the group and corresponding ERROR inputs to make MF=31 and 35 files
+def _TEMPLATE_GROUPR_FOR_PLOT(num_temp):
+    """
+    Expands template to include variable # of temps for multi-temp chi/nu generation
+    Parameters
+    ----------
+    num_temp : int
+        Number of temps to generate info for
+
+    Returns
+    -------
+    str
+        Commands for GROUPR
+    """
+
+    s = """
+groupr
+{nendf} {ngroupr_in} 0 {ngroupr_out}/
+{mat} 3 0 6 1 {num_temp}/ 30 groups, thermal, 1/2, fission/fusion spectrum
+nu/chi / 
+{temps}/
+1e10/ background sigma (need to include "inf")"""
+
+
+    for i in range(num_temp):
+        s += """
+3 452 'nu'/
+3 455 'p nu'/
+3 456 'd nu'/
+3 18 'fiss'/
+5 18 'chi'/
+0/
+"""
+    s += "0/\n"
+    return s
+
 _THERMAL_TEMPLATE_THERMR = """
 thermr / %%%%%%%%%%%%%%%% Add thermal scattering data (free gas) %%%%%%%%%%%%%%%
 0 {nthermr1_in} {nthermr1}
@@ -149,15 +185,36 @@ thermr / %%%%%%%%%%%%%%%% Add thermal scattering data (bound) %%%%%%%%%%%%%%%%%%
 mfcov int
     the cov mf # to read, one of: 31, 33, 34, 35 or 40. 33 default for NJOY but must be provided here
 """
-_TEMPLATE_ERRORR = """
+
+# MF=33 is for neutron reaction data
+_TEMPLATE_ERRORR_33 = """
 errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {nerr_in} 0 {nerr}/
 {mat} 1/
 0 {temperature}/
-0 {mfcov}/
+0 33/
 {cov_ngroups}/
 {cov_group_bounds}/
 """
+
+# MF=31 is for fission nu-bar
+_TEMPLATE_ERRORR_31 = """
+errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{nendf} {nerr_in} {ngroupr_out} {nerr}/
+{mat} 3 6 1 1/ 30 group default spectrum
+1 {temperature}/
+0 31 1 1 -1/
+"""
+
+# MF=35 is for fission chi
+_TEMPLATE_ERRORR_35 = """
+errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{nendf} {nerr_in} {ngroupr_out} {nerr}/
+{mat} 3 6 1 1/ 30 group default spectrum
+1 {temperature}/
+0 35 1 1 -1/
+"""
+
 
 def _TEMPLATE_COVR_FOR_PLOT(mts):
     """
@@ -165,7 +222,7 @@ def _TEMPLATE_COVR_FOR_PLOT(mts):
     Parameters
     ----------
     mts : list
-        List of MTs to plot
+        List of MTs to plot, or empty for all mts available
 
     Returns
     -------
@@ -179,14 +236,20 @@ covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (PLOT) %%%%%%%%%%%%%%%%%%%%%%%%
 1/
 /
 1 {n_mats}/
-""".format(n_mats=len(mts))
+"""
+
+    num_mts = len(mts) if len(mts) >= 1 else 1
+    s = s.format(n_mats=num_mts)
+
+    if not mts:
+        s += "{mat}/\n"
 
     for mt in mts:
         s += "{{mat}} {mt} {{mat}} {mt}/\n".format(mt=mt)
 
     return s
 
-_TEMPLATE_COVR_FOR_TEXT = """
+_TEMPLATE_COVR_FOR_LIB = """
 covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (DATA) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nerr} {covr_out}/
 4/
@@ -304,7 +367,7 @@ def make_pendf(filename, pendf='pendf', error=0.001, stdout=False):
 
 def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=None,
                   error=0.001, broadr=True, heatr=True, purr=True, acer=True, errorr=True,
-                  cov_energy_groups=None, run=False, covr_plot_mts=None, **kwargs):
+                  cov_energy_groups=None, run=False, covr_plot_mts=None, chi_nu_bar=False, **kwargs):
     """Generate incident neutron ACE file from an ENDF file
 
     Parameters
@@ -396,17 +459,16 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
         for i, temperature in enumerate(temperatures):
             nerr_in = nbroadr  # PENDF tape that was broadened to right temp
             nerr = nlast + 1
-            mfcov = 33
             cov_group_bounds = [str(e) for e in cov_energy_groups]
             # inefficient way to ensure we don't go past 80 chars for fortran limitations
             cov_group_bounds = ' \n'.join(cov_group_bounds)
-            commands += _TEMPLATE_ERRORR.format(**locals())
+            commands += _TEMPLATE_ERRORR_33.format(**locals())
             nlast += 1
 
             covr_out = nlast + 1
             tapeout[covr_out] = fname.format("covr", temperature) + ".txt"
             nlast += 1
-            commands += _TEMPLATE_COVR_FOR_TEXT.format(**locals())
+            commands += _TEMPLATE_COVR_FOR_LIB.format(**locals())
 
             if covr_plot_mts:
                 covr_plot_out = nlast + 1   # needed as input to viewr
@@ -418,6 +480,60 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
 
                 commands += _TEMPLATE_COVR_FOR_PLOT(covr_plot_mts).format(**locals())
                 commands += _TEMPLATE_VIEWR.format(**locals())
+
+        if chi_nu_bar:
+            commands += "-- Chi + Nu-bar info\n"
+            ngroupr_in = nbroadr  # PENDF tape
+            ngroupr_out = nlast + 1
+            s = _TEMPLATE_GROUPR_FOR_PLOT(num_temp)
+            commands += s.format(**locals())
+
+            nlast += 1
+
+            nerr_in = nbroadr  # PENDF tape
+            nerr = nlast + 1
+            commands += _TEMPLATE_ERRORR_31.format(**locals())
+            nlast += 1
+
+
+            covr_plot_out = nlast + 1   # needed as input to viewr
+            nlast += 1
+
+            viewr_plot_out = nlast + 1
+            tapeout[viewr_plot_out] = fname.format("viewr_nu_", temperature) + ".eps"
+            nlast += 1
+
+            commands += _TEMPLATE_COVR_FOR_PLOT([452]).format(**locals())
+            commands += _TEMPLATE_VIEWR.format(**locals())
+
+            covr_out = nlast + 1
+            tapeout[covr_out] = fname.format("covr_nu", temperature) + ".txt"
+            nlast += 1
+            commands += _TEMPLATE_COVR_FOR_LIB.format(**locals())
+
+            ## Chi
+            nerr_in = nbroadr  # PENDF tape
+            nerr = nlast + 1
+            commands += _TEMPLATE_ERRORR_35.format(**locals())
+            nlast += 1
+
+
+            covr_plot_out = nlast + 1   # needed as input to viewr
+            nlast += 1
+
+            viewr_plot_out = nlast + 1
+            tapeout[viewr_plot_out] = fname.format("viewr_chi_", temperature) + ".eps"
+            nlast += 1
+
+            commands += _TEMPLATE_COVR_FOR_PLOT([]).format(**locals())
+            commands += _TEMPLATE_VIEWR.format(**locals())
+
+            covr_out = nlast + 1
+            tapeout[covr_out] = fname.format("covr_chi", temperature) + ".txt"
+            nlast += 1
+            commands += _TEMPLATE_COVR_FOR_LIB.format(**locals())
+
+
 
     # heatr
     if heatr:
@@ -452,6 +568,9 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
     commands += 'stop\n'
     if run:
         run(commands, tapein, tapeout, **kwargs)
+    else:
+        with open('njoy_in.txt', 'w') as f:
+            f.write(commands)
 
     if acer:
         if run:
@@ -617,4 +736,5 @@ def make_ace_thermal(filename, filename_thermal, temperatures=None,
         
 if __name__ == "__main__":
     make_njoy_run('../data/e8/tape20', temperatures=[300], ace='ace', xsdir='xsdir', pendf=None,
-                  error=0.001, broadr=True, heatr=False, purr=False, acer=False, errorr=True, **{'input_filename': '../data/cov_u235.i', 'stdout': True})
+                  error=0.001, broadr=True, heatr=False, purr=False, acer=False, errorr=True,
+                  run=False, chi_nu_bar=True, **{'input_filename': '../data/cov_u235.i', 'stdout': True})
