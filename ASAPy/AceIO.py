@@ -78,7 +78,7 @@ class AceEditor:
         Returns
         -------
         np.array
-            Energies at which neutrons are emitted during fission
+            Incident neutron energy causing fission
         np.array
             Total number of neutrons emitted per fission
         """

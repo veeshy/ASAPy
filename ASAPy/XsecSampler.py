@@ -310,14 +310,23 @@ def get_mt_from_ace(ace_file, zaid, mt):
         Cross-section values
     """
 
-    # base_ace = './xe135m/Xe135m-n.ace.txt'
-    libFile = ace.Library(os.path.expanduser(ace_file))
-    libFile.read()
-    libFile.find_table(str(zaid))
-    xsec_tables = libFile.tables[list(libFile.tables.keys())[0]]
+    ace_path = os.path.expanduser(ace_file)
+    non_typical_xsec = [452]
+    if mt in non_typical_xsec:
 
-    e = xsec_tables.energy
-    st = xsec_tables.find_reaction(mt).sigma
+        libFile = AceIO.AceEditor(ace_path)
+        if mt == 452:
+            # got an atypical mt
+            e, st = libFile.get_nu_distro()
+
+    else:
+        libFile = ace.Library(ace_path)
+        libFile.read()
+        libFile.find_table(str(zaid))
+        xsec_tables = libFile.tables[list(libFile.tables.keys())[0]]
+
+        e = xsec_tables.energy
+        st = xsec_tables.find_reaction(mt).sigma
 
     return e, st
 
