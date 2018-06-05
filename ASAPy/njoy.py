@@ -150,8 +150,8 @@ def _TEMPLATE_GROUPR_FOR_PLOT(num_temp):
     s = """
 groupr
 {nendf} {ngroupr_in} 0 {ngroupr_out}/
-{mat} 3 0 6 1 {num_temp}/ 30 groups, thermal, 1/2, fission/fusion spectrum
-nu/chi / 
+{mat} 3 0 9 1 {num_temp}/ 30 groups, claw weight flux
+nu and chi / 
 {temps}/
 1e10/ background sigma (need to include "inf")"""
 
@@ -201,7 +201,7 @@ errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 _TEMPLATE_ERRORR_31 = """
 errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {nerr_in} {ngroupr_out} {nerr}/
-{mat} 3 6 1 1/ 30 group default spectrum
+{mat} 3 9 1 1/ 30 group, claw weight function
 1 {temperature}/
 0 31 1 1 -1/
 """
@@ -210,7 +210,7 @@ errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 _TEMPLATE_ERRORR_35 = """
 errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {nerr_in} {ngroupr_out} {nerr}/
-{mat} 3 6 1 1/ 30 group default spectrum
+{mat} 3 9 1 1/ 30 group claw weight function
 1 {temperature}/
 0 35 1 1 -1/
 """
@@ -367,7 +367,7 @@ def make_pendf(filename, pendf='pendf', error=0.001, stdout=False):
 
 def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=None,
                   error=0.001, broadr=True, heatr=True, purr=True, acer=True, errorr=True,
-                  cov_energy_groups=None, run=False, covr_plot_mts=None, chi_nu_bar=False, **kwargs):
+                  cov_energy_groups=None, run=False, covr_plot_mts=None, chi=False, nu=False, **kwargs):
     """Generate incident neutron ACE file from an ENDF file
 
     Parameters
@@ -399,6 +399,12 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
         Defaults to 239 groups
     run : bool, optional
         Run njoy
+    covr_plot_mts : list
+        List of mts to plot using plotr
+    chi : bool
+        Calculate chi cov via groupr
+    nu : bool
+        Calculate nu cov via groupr
     **kwargs
         Keyword arguments passed to :func:`openmc.data.njoy.run`
 
@@ -481,8 +487,8 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
                 commands += _TEMPLATE_COVR_FOR_PLOT(covr_plot_mts).format(**locals())
                 commands += _TEMPLATE_VIEWR.format(**locals())
 
-        if chi_nu_bar:
-            commands += "-- Chi + Nu-bar info\n"
+        if nu:
+            commands += "-- Nu-bar info\n"
             ngroupr_in = nbroadr  # PENDF tape
             ngroupr_out = nlast + 1
             s = _TEMPLATE_GROUPR_FOR_PLOT(num_temp)
@@ -511,7 +517,8 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             nlast += 1
             commands += _TEMPLATE_COVR_FOR_LIB.format(**locals())
 
-            ## Chi
+        if chi:
+            commands += "-- Chi info\n"
             nerr_in = nbroadr  # PENDF tape
             nerr = nlast + 1
             commands += _TEMPLATE_ERRORR_35.format(**locals())
@@ -735,6 +742,6 @@ def make_ace_thermal(filename, filename_thermal, temperatures=None,
     run(commands, tapein, tapeout, **kwargs)
         
 if __name__ == "__main__":
-    make_njoy_run('../data/e8/tape20', temperatures=[300], ace='ace', xsdir='xsdir', pendf=None,
+    make_njoy_run('/Users/veeshy/projects/ASAPy/data/e71/tape20', temperatures=[300], ace='ace', xsdir='xsdir', pendf=None,
                   error=0.001, broadr=True, heatr=False, purr=False, acer=False, errorr=True,
-                  run=False, chi_nu_bar=True, **{'input_filename': '../data/cov_u235.i', 'stdout': True})
+                  run=False, chi=False, nu=True, **{'input_filename': '../data/e71/input', 'stdout': True})
