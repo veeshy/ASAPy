@@ -24,11 +24,32 @@ class AceEditor:
 
         self.ace_path = ace_path
         self.table = table
-        self.energy = table.energy
         self.all_mts = self.table.reactions.keys()
         # store the original sigma so it will be easy to retrieve it later
         self.original_sigma = {}
         self.adjusted_mts = set()
+
+    def get_energy(self, mt):
+        """
+        Gets evaluated energies for mt. Mostly lets us handle non reaction type energies like nu-bar.
+
+        Parameters
+        ----------
+        mt
+
+        Returns
+        -------
+        list
+            Energies where mt is defined
+
+        """
+
+        if mt in [452]:
+            energy, _ = self.get_nu_distro()
+        else:
+            energy = self.table.energy
+
+        return energy
 
     def get_chi_distro(self, mt=18):
         """
@@ -113,12 +134,19 @@ class AceEditor:
             Mutable nd.array
 
         """
-        rx = self.table.find_reaction(mt)
 
-        if rx is None:
-            raise ValueError("MT {mt} not present in this ace file {ace}".format(mt=mt, ace=self.ace_path))
+        # handle nu differently than other xsec
+        if mt in [452]:
+            _, sigma = self.get_nu_distro()
+        else:
+            rx = self.table.find_reaction(mt)
 
-        return rx.sigma
+            if rx is None:
+                raise ValueError("MT {mt} not present in this ace file {ace}".format(mt=mt, ace=self.ace_path))
+
+            sigma = rx.sigma
+
+        return sigma
 
     def set_sigma(self, mt, sigma):
         """
@@ -129,14 +157,18 @@ class AceEditor:
         sigma : nd.array
         """
 
-        if len(sigma) != len(self.energy):
-            raise IndexError('Length of sigma provided does not match energy bins got: {0}, needed: {1}'.format(len(sigma), len(self.energy)))
+        energy = self.get_energy(mt)
+        if len(sigma) != len(energy):
+            raise IndexError('Length of sigma provided does not match energy bins got: {0}, needed: {1}'.format(len(sigma), len(energy)))
 
         current_sigma = self.get_sigma(mt)
         if mt not in self.original_sigma.keys():
             self.original_sigma[mt] = current_sigma.copy()
 
-        self.table.find_reaction(mt).sigma = sigma
+        if mt in [452]:
+            self.table.nu_t_value = sigma
+        else:
+            self.table.find_reaction(mt).sigma = sigma
 
         self.adjusted_mts.add(mt)
 
