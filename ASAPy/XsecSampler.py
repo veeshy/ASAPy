@@ -511,7 +511,7 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
     xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
 
     ae = AceIO.AceEditor(ace_file)
-    e = ae.energy
+    e = ae.get_energy(mt)
     original_sigma = ae.get_sigma(mt)
 
     # sample_df contains relative values (sampled / mean) which are then multiplied by the actual continuous xsec and written to an ace file
@@ -522,7 +522,7 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
         ae.apply_sum_rules()
 
         w = AceIO.WriteAce(ace_file)
-        w.replace_array(original_sigma, ae.get_sigma(102))
+        w.replace_array(original_sigma, ae.get_sigma(mt))
         w.write_ace(output_formatter.format(idx))
 
     # add in e groups then print all relative data and the base xsec
@@ -543,11 +543,11 @@ if __name__ == "__main__":
         zaid = 92235
         mt = 452
 
-        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 500)
+        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 15)
 
-        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base='./', log_y=False)
+        #plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base='./', log_y=False)
 
-        # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='../u235_fis/u_{0}')
+        write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='../u235_nu/u_{0}')
 
         #
 
