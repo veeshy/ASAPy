@@ -330,7 +330,25 @@ def get_mt_from_ace(ace_file, zaid, mt):
 
     return e, st
 
-def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zaid_2=None, mt_2=None, output_base=''):
+def set_log_scale(ax, log_x, log_y):
+    """
+    Changes ax scale as desired
+
+    Parameters
+    ----------
+    ax : matplotlib.ax
+    log_x : bool
+        True to set scale to log
+    log_y : bool
+        True to set scale to log
+
+    """
+    if log_x:
+        ax.set_xscale('log')
+    if log_y:
+        ax.set_yscale('log')
+def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zaid_2=None, mt_2=None, output_base='',
+                      log_x=True, log_y=True):
     """
     Plots diag of cov, a few xsecs, and full corr matrix of the sampled data
     Parameters
@@ -344,13 +362,19 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     mt_2
     output_base : str
         Base folder to output at
+    log_x : bool
+        True to set axis scale to log
+    log_y : bool
+        True to set axis scale to log
     """
     # plot the cov
     xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
 
     fig, ax = plt.subplots()
-    ax.loglog(xsec['e high'], xsec['s.d.(1)'] ** 2, drawstyle='steps-mid', label='Diag(cov) ENDF')
-    ax.loglog(xsec['e high'], np.diag(np.cov(sample_df_full_vals)), drawstyle='steps-mid', label='Diag(cov) Sampled')
+    ax.plot(xsec['e high'], xsec['s.d.(1)'] ** 2, drawstyle='steps-mid', label='Diag(cov) ENDF')
+    ax.plot(xsec['e high'], np.diag(np.cov(sample_df_full_vals)), drawstyle='steps-mid', label='Diag(cov) Sampled')
+    set_log_scale(ax, log_x, log_y)
+
     ax.legend()
     ax.set_xlabel("Energy (eV)")
     ax.set_ylabel("Covariance")
@@ -369,13 +393,14 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
         num_xsec = xsec.shape[1]
 
     # plot the base x-sec too
-    ax.loglog(e * 1e6, st, linestyle='-.', color='k')
+    ax.plot(e * 1e6, st, linestyle='-.', color='k')
 
     for i in range(num_xsec):
-        ax.loglog(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i],
-                                                    min_e=xsec['e low'].min() - 1) * st, label=i)
+        ax.plot(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i],
+                                                  min_e=xsec['e low'].min() - 1) * st, label=i)
     # plot the base again so it appears on top
-    ax.loglog(e * 1e6, st, linestyle='-.', color='k')
+    ax.plot(e * 1e6, st, linestyle='-.', color='k')
+    set_log_scale(ax, log_x, log_y)
 
     ax.legend(['Actual', 'Samples'])
 
@@ -404,7 +429,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     plot_xsec(ace_file, h, zaid, mt, output_base)
 
 
-def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False):
+def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, log_x=True, log_y=True):
     """
     Plots xsec from ACE file and rel deviation from error store for ZAID's mt
 
@@ -416,6 +441,12 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False):
     mt
     output_base : str
         Base path to save plot to
+    pad_rel_y_decades : bool
+        Ensures at least two decades of standard deviation is plotted
+    log_x : bool
+        True to set axis scale to log
+    log_y : bool
+        True to set axis scale to log
 
     Returns
     -------
@@ -427,7 +458,7 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False):
     fig = plt.figure(figsize=(6, 4))
     gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1.3])
     ax = fig.add_subplot(gs[0])
-    ax.loglog(e * 1e6, st)
+    ax.plot(e * 1e6, st)
     ax.grid(alpha=0.25)
     # turn off the x labels w/o turning off the grid x
     for tic in ax.xaxis.get_major_ticks():
@@ -435,9 +466,12 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False):
         tic.label1On = tic.label2On = False
     ax.set_ylabel('Cross-Section (b)')
 
+    set_log_scale(ax, log_x, log_y)
+
     # second plot (rel dev %)
     ax2 = fig.add_subplot(gs[1], sharex=ax)  # the above ax
-    ax2.loglog(xsec['e high'], xsec['rel.s.d.(1)'] * 100, drawstyle='steps-mid')
+    ax2.plot(xsec['e high'], xsec['rel.s.d.(1)'] * 100, drawstyle='steps-mid')
+    set_log_scale(ax, log_x, log_y)
 
     ax2.set_xlabel('Energy (eV)')
     ax2.set_ylabel('% Rel. Dev.')
@@ -507,17 +541,17 @@ if __name__ == "__main__":
 
         ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
         zaid = 92235
-        mt = 18
+        mt = 452
 
-        # sample_df, sample_df_full = sample_xsec(h, mt, zaid, 1000)
-        #
-        # plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base='../u235_fis/')
-        #
+        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 500)
+
+        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base='./', log_y=False)
+
         # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='../u235_fis/u_{0}')
-        #
+
         #
 
         # ace_file = '/Users/veeshy/MCNP6/MCNP_DATA/xdata/endf71x/W/74180.710nc'
         # zaid = 74184
         # mt = 102
-        plot_xsec(ace_file, h, zaid, mt, output_base='./')
+        # plot_xsec(ace_file, h, zaid, mt, output_base='./')
