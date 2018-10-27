@@ -88,7 +88,7 @@ class XsecSampler:
         Parameters
         ----------
         sample_type : str
-            'norm' or 'lognorm' to perform multi-variate sampling using these distros
+            'norm' or 'lognorm' or 'uncorrelated' to perform multi-variate sampling using these distros
         n : int
             Number of samples
         raise_on_bad_sample : bool
@@ -115,6 +115,12 @@ class XsecSampler:
             samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
                                                              self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
                                                              over_sample_n, distro='lognorm')
+        elif sample_type.lower() == 'uncorrelated':
+            # use a correlation of diag(1)
+            samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
+                                                             self.std_dev_df['s.d.(1)'].values, np.diag(np.ones(len(self.std_dev_df['x-sec(1)'].values))),
+                                                             over_sample_n, distro='lognorm')
+
         else:
             raise Exception('Sampling type: {0} not implimented'.format(sample_type))
 
@@ -265,7 +271,7 @@ def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', rem
         The ZAID for the cross-section to sample
     num_samples : int
     sample_type : str
-        'lognorm' or 'norm' for sampling the data
+        'lognorm', 'norm', 'uncorrelated' for sampling the data
     remove_neg : boolean
         Flag to remove samples if they are negative (Removes full samples not just sets neg to zero)
 
@@ -541,13 +547,13 @@ if __name__ == "__main__":
 
         ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
         zaid = 92235
-        mt = 452
+        mt = 102 #452
 
-        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 15)
+        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 20, sample_type='uncorrelated')
 
-        #plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base='./', log_y=False)
+        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base='./', log_y=True)
 
-        write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='../u235_nu/u_{0}')
+        # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='../u235_nu/u_{0}')
 
         #
 
