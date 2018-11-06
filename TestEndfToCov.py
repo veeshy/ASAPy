@@ -33,7 +33,8 @@ class TestRunCoverChain(TestCase):
         cls.test_dir = '../test_data/run_cover_chain_test_out/'
 
     def testChain(self):
-        shutil.rmtree(self.test_dir)
+        if os.path.exists(self.test_dir):
+            shutil.rmtree(self.test_dir)
         os.makedirs(self.test_dir)
         EndfToCov.run_cover_chain("../test_data/n_0125_1-H-1.dat", [2, 102], [300, 2400], output_dir=self.test_dir)
 
