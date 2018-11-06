@@ -23,7 +23,7 @@ def _df_corr_index(n_groups):
     -------
 
     """
-    return pd.Index(list(range(n_groups)))
+    return pd.Index(list(range(1, 1+n_groups)))
 
 
 def _df_corr_columns(n_groups):
@@ -39,7 +39,7 @@ def _df_corr_columns(n_groups):
     list
 
     """
-    return list(range(n_groups))
+    return list(range(1, 1+n_groups))
 
 
 def _df_stddev_columns():
@@ -50,7 +50,7 @@ def _df_stddev_columns():
     -------
     list
     """
-    return ['groups', 'e high', 'x-sec(1)', 'rel.s.d.(1)', 's.d.(1)']
+    return ['e low', 'e high', 'x-sec(1)', 'x-sec(2)', 'rel.s.d.(1)', 'rel.s.d(2)', 's.d.(1)', 's.d(2)']
 
 
 def _df_stddev_index(n_groups):
@@ -65,21 +65,21 @@ def _df_stddev_index(n_groups):
     pd.Index
 
     """
-    return pd.Index(list(range(n_groups)), name='groups')
+    return pd.Index(list(range(1, 1+n_groups)), name='groups')
 
 
 def create_stddev_df(n_groups):
-    df = pd.DataFrame(index=_df_stddev_index(n_groups), columns=_df_stddev_columns())
+    df = pd.DataFrame(index=_df_stddev_index(n_groups), columns=_df_stddev_columns(), dtype=float)
     return df
 
 
 def create_corr_df(n_groups):
-    df = pd.DataFrame(index=_df_corr_index(n_groups), columns=_df_corr_columns(n_groups))
+    df = pd.DataFrame(index=_df_corr_index(n_groups), columns=_df_corr_columns(n_groups), dtype=float)
     return df
 
 def check_correlation_df(df):
     assert len(df.columns) == len(df.index), "Non square correlation matrix"
-    assert df.columns.values == df.index.values, "Group labels not equal in correlation matrix"
+    assert (df.columns.values == df.index.values).all(), "Group labels not equal in correlation matrix"
 
 def add_corr_to_store(store, df, mat1, mt1, mat2, mt2):
     """
@@ -97,10 +97,12 @@ def add_corr_to_store(store, df, mat1, mt1, mat2, mt2):
     """
 
     check_correlation_df(df)
-    store.put(df_key_corr_formatter.format(mat1, mt1, mat2, mt2), df)
+    store.put(df_key_corr_formatter.format(mat1=mat1, mt1=mt1, mat2=mat2, mt2=mt2), df)
 
 def check_stddev_df(df):
-    assert df.values[0, 0] < df.values[1, 0], "Energy bins should be in decreasing order"
+    groups = df.shape[0]
+    assert (df.loc[1:groups-1, 'e low'].values > df.loc[2:, 'e low'].values).all(), "Energy (low) bins should be in decreasing order"
+    assert (df.loc[1:groups-1, 'e high'].values > df.loc[2:,'e high'].values).all(), "Energy (high_bins should be in decreasing order"
 
 def add_stddev_to_store(store, df, mat1, mt1, mat2, mt2):
     """
@@ -118,4 +120,4 @@ def add_stddev_to_store(store, df, mat1, mt1, mat2, mt2):
     """
 
     check_stddev_df(df)
-    store.put(df_key_stddev_formatter.format(mat1, mt1, mat2, mt2), df)
+    store.put(df_key_stddev_formatter.format(mat1=mat1, mt1=mt1, mat2=mat2, mt2=mt2), df)
