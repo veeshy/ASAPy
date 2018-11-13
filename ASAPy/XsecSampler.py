@@ -11,6 +11,7 @@ from matplotlib.ticker import FormatStrFormatter
 from ASAPy import CovManipulation
 from ASAPy import AceIO
 #
+from mcnptallyreader import flux_routines
 
 class XsecSampler:
     def __init__(self, h, zaid_1, mt_1, zaid_2=None, mt_2=None):
@@ -354,7 +355,7 @@ def set_log_scale(ax, log_x, log_y):
     if log_y:
         ax.set_yscale('log')
 def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zaid_2=None, mt_2=None, output_base='',
-                      log_x=True, log_y=True):
+                      log_x=True, log_y=True, log_y_stddev=False):
     """
     Plots diag of cov, a few xsecs, and full corr matrix of the sampled data
     Parameters
@@ -377,8 +378,8 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
 
     fig, ax = plt.subplots()
-    ax.plot(xsec['e high'], xsec['s.d.(1)'] ** 2, drawstyle='steps-mid', label='Diag(cov) ENDF')
-    ax.plot(xsec['e high'], np.diag(np.cov(sample_df_full_vals)), drawstyle='steps-mid', label='Diag(cov) Sampled')
+    ax.plot(xsec['e high'], xsec['s.d.(1)'] ** 2, drawstyle='steps-post', label='Diag(cov) ENDF')
+    ax.plot(xsec['e high'], np.diag(np.cov(sample_df_full_vals)), drawstyle='steps-post', label='Diag(cov) Sampled')
     set_log_scale(ax, log_x, log_y)
 
     ax.legend()
@@ -395,8 +396,8 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     num_xsec = 20
 
     # if less than num_xsec samples, plot all of them
-    if num_xsec > xsec.shape[1]:
-        num_xsec = xsec.shape[1]
+    if num_xsec > sample_df.shape[1]:
+        num_xsec = sample_df.shape[1]
 
     # plot the base x-sec too
     ax.plot(e * 1e6, st, linestyle='-.', color='k')
@@ -404,9 +405,12 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     for i in range(num_xsec):
         ax.plot(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i],
                                                   min_e=xsec['e low'].min() - 1) * st, label=i)
+
+    ax.set_xlim([1e-3, 1.0])
+    ax.set_ylim([75, 125])
     # plot the base again so it appears on top
     ax.plot(e * 1e6, st, linestyle='-.', color='k')
-    set_log_scale(ax, log_x, log_y)
+    set_log_scale(ax, log_x, False)
 
     ax.legend(['Actual', 'Samples'])
 
@@ -432,10 +436,10 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     fig.tight_layout()
     plt.savefig("{2}{3}{0}_{1}_sampled_corr_compare.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
 
-    plot_xsec(ace_file, h, zaid, mt, output_base)
+    plot_xsec(ace_file, h, zaid, mt, output_base, log_y_stddev=log_y_stddev)
 
 
-def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, log_x=True, log_y=True):
+def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, log_x=True, log_y=True, log_y_stddev=False):
     """
     Plots xsec from ACE file and rel deviation from error store for ZAID's mt
 
@@ -453,6 +457,8 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, 
         True to set axis scale to log
     log_y : bool
         True to set axis scale to log
+    log_y_stddev : bool
+        True to set stddev scale to log
 
     Returns
     -------
@@ -476,7 +482,7 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, 
 
     # second plot (rel dev %)
     ax2 = fig.add_subplot(gs[1], sharex=ax)  # the above ax
-    ax2.plot(xsec['e high'], xsec['rel.s.d.(1)'] * 100, drawstyle='steps-mid')
+    ax2.plot(xsec['e high'], xsec['rel.s.d.(1)'] * 100, drawstyle='steps-post')
     set_log_scale(ax, log_x, log_y)
 
     ax2.set_xlabel('Energy (eV)')
@@ -497,6 +503,9 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, 
 
         ax2.set_ylim([low_val, high_val])
 
+    if log_y_stddev:
+        ax2.set_yscale('log')
+
     ax2.yaxis.set_major_formatter(FormatStrFormatter('%g'))
 
     plt.savefig("{2}{3}{0}_{1}_base_xsec_with_std.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
@@ -509,7 +518,7 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
     :param h: the cov h5 handle
     :param ace_file:
     :param sample_df_rel:
-    :param output_formatter:
+    :param output_formatter: str, 'some_text_{0}_formatter_to_add_number_to'
     :return:
     """
 
@@ -536,24 +545,38 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
     sample_df_rel.insert(1, 'e high', xsec['e high'])
     sample_df_rel.insert(2, 'xsec', xsec['x-sec(1)'])
     sample_df_rel.insert(3, 'std', xsec['rel.s.d.(1)'])
-    sample_df_rel.to_csv('{0}.csv'.format(output_formatter.format('samples')))
+    sample_df_rel.to_csv('{0}_samples.csv'.format(output_formatter.format('data')))
 
 
 if __name__ == "__main__":
     import os
 
     store_name = '../scale_cov_252.h5'
+    store_name = '../u235_18_44_group.h5'
     with pd.HDFStore(store_name, 'r') as h:
 
         ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
         zaid = 92235
         mt = 102 #452
 
-        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 20, sample_type='uncorrelated')
+        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 1000, sample_type='uncorrelated')
 
-        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base='./', log_y=True)
+        # output_base = '../run_cover_chain_test_out/'
+        output_base = '../u235_uncorrelated_18/'
 
-        # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter='../u235_nu/u_{0}')
+        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True, log_y_stddev=False)
+        #
+        write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u235_{0}')
+        #
+        # ####
+        #
+        # sample_df, sample_df_full = sample_xsec(h, mt, zaid, 500, sample_type='uncorrelated')
+        #
+        # output_base = '../u235_uncorrelated/'
+        #
+        # plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True)
+        #
+        # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/samples_u235_{0}')
 
         #
 
