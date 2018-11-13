@@ -214,7 +214,8 @@ class read_boxer_out_matrix:
 
         group_bounds = self._block_lines_to_array(self.block_line_nums[0] + 1, self.block_line_nums[1])
         xsec = self._block_lines_to_array(self.block_line_nums[1] + 1, self.block_line_nums[2])
-        std_dev = self._block_lines_to_array(self.block_line_nums[2] + 1, self.block_line_nums[3])
+        rel_dev = self._block_lines_to_array(self.block_line_nums[2] + 1, self.block_line_nums[3])
+        std_dev = rel_dev * xsec
         cov = self._block_lines_to_array(self.block_line_nums[3] + 1, len(self.lines))
 
         number_of_xsec = len(xsec)
@@ -256,7 +257,7 @@ class read_boxer_out_matrix:
 
         return values
 
-def run_cover_chain(endf_file, mts, temperatures, output_dir='./'):
+def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_groups=None):
     """
     Creates cov matrix and plots for mts and temperatures for the end file
     Parameters
@@ -272,11 +273,16 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./'):
 
     if not isinstance(mts, list):
         mts = [mts]
+
     if not isinstance(temperatures, list):
         temperatures = [temperatures]
+
+    if not cov_energy_groups:
+        cov_energy_groups = njoy.energy_groups_238
+
     mat_num = njoy.get_mat_from_endf(endf_file)
     njoy_commands, tapein, tapeout = njoy.make_njoy_run(endf_file, temperatures=temperatures, pendf=None, error=0.001,
-                                                        covr_plot_mts=mts,
+                                                        covr_plot_mts=mts, cov_energy_groups=cov_energy_groups,
                                                         broadr=True, heatr=False, purr=False, acer=False, errorr=True)
 
     # we know the order of tape out {covout1, plotout1,, covout2, plotout2, ...}, just get the cov outs
@@ -287,7 +293,70 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./'):
                      boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat', output_base_path=output_dir)
 
 if __name__ == "__main__":
-    run_cover_chain("n_0125_1-H-1.dat", [2, 102], [300, 2400], output_dir='./run_cover_chain_test_out/')
+    import pandas as pd
+
+    # run_cover_chain("../test_data/n_0125_1-H-1.dat", [18], [300],
+    #                 output_dir='../run_cover_chain_test_out/',
+    #                 cov_energy_groups=njoy.energy_groups_44)
+
+    # rbo = read_boxer_out_matrix('../run_cover_chain_test_out/covr_2400.txt_2_matrix.txt')
+    #
+    # group_bounds, xsec, std_dev, cov = rbo.get_block_data()
+    #
+    # groups = 238
+    #
+    # with pd.HDFStore('test_put.h5', 'w') as h:
+    #
+    #     df = AsapyCovStorage.create_corr_df(groups)
+    #
+    #     df.loc[:, :] = cov
+    #     AsapyCovStorage.add_corr_to_store(h, df, '1001', '102', '1001', '102')
+    #     df = AsapyCovStorage.create_stddev_df(groups)
+    #
+    #     df['e high'] = group_bounds[0:-1]
+    #     df['e low'] = group_bounds[1:]
+    #     df['x-sec(1)'] = xsec
+    #     df['x-sec(2)'] = xsec
+    #     df['rel.s.d.(1)'] = std_dev / xsec
+    #     df['rel.s.d(2)'] = std_dev / xsec
+    #     df['s.d.(1)'] = std_dev
+    #     df['s.d(2)'] = std_dev
+    #
+    #     AsapyCovStorage.add_stddev_to_store(h, df, '1001', '102', '1001', '102')
+
+    mt = 102
+    run_cover_chain("/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf", [mt], [300],
+                    output_dir='../run_cover_chain_test_out/',
+                    cov_energy_groups=njoy.energy_groups_238)
+
+    rbo = read_boxer_out_matrix('../run_cover_chain_test_out/covr_300.txt_{mt}_matrix.txt'.format(mt=mt))
+
+    group_bounds, xsec, std_dev, cov = rbo.get_block_data()
+
+    groups = cov.shape[0]
+
+    with pd.HDFStore('test_put.h5', 'a') as h:
+
+        zaid = 92235
+
+
+        df = AsapyCovStorage.create_corr_df(groups)
+
+        df.loc[:, :] = cov
+        AsapyCovStorage.add_corr_to_store(h, df, zaid, mt, zaid, mt)
+        df = AsapyCovStorage.create_stddev_df(groups)
+
+        df['e high'] = group_bounds[0:-1]
+        df['e low'] = group_bounds[1:]
+        df['x-sec(1)'] = xsec
+        df['x-sec(2)'] = xsec
+        df['rel.s.d.(1)'] = std_dev / xsec
+        df['rel.s.d(2)'] = std_dev / xsec
+        df['s.d.(1)'] = std_dev
+        df['s.d(2)'] = std_dev
+
+        AsapyCovStorage.add_stddev_to_store(h, df, zaid, mt, zaid, mt)
+
 
 # for each mat/mt cov:
 #   read the tape.21 outputs (mat_mt_mat_mt.mat)
