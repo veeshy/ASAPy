@@ -56,6 +56,7 @@ class XsecSampler:
         corr_df = corr_df / corr_df.loc[1, 1]
 
         # make sure e low and e high are in the correct order
+        # todo: fix: this is a dumb workaround for my parsed scale cov which flipped e high and e low keys
         if std_dev_df['e low'][1] > std_dev_df['e high'][1]:
             # swap e low and e high values
             temp_e = std_dev_df['e low'].values
@@ -183,16 +184,19 @@ class XsecSampler:
         """
 
         eigs, P = LA.eigh(corr_matrix)
-        print('eig_replace: got eig', min(eigs))
-        # replace all negative and zero eigs with a small eps
-        bad_index = np.where(eigs <= 1e-8)
+        if min(eigs) <= 1e-8:
+            print('eig_replace: got eig', min(eigs))
+            # replace all negative and zero eigs with a small eps
+            bad_index = np.where(eigs <= 1e-8)
 
-        # set to some small number
-        eigs[bad_index] = min(1e-8 * max(eigs), 1e-8)
+            # set to some small number
+            eigs[bad_index] = min(1e-8 * max(eigs), 1e-8)
 
-        # remake the corr matrix with these bad eigenvalues removed
-        fixed_corr = np.dot(np.dot(P, np.diag(eigs)), LA.inv(P))
-        print('eig_replace: created eig', min(LA.eigvals(fixed_corr)))
+            # remake the corr matrix with these bad eigenvalues removed
+            fixed_corr = np.dot(np.dot(P, np.diag(eigs)), LA.inv(P))
+            print('eig_replace: created eig', min(LA.eigvals(fixed_corr)))
+        else:
+            fixed_corr = corr_matrix
 
         return fixed_corr
 
@@ -284,6 +288,10 @@ def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', rem
     -------
 
     """
+
+    # ensure type
+    num_samples = int(num_samples)
+
     h = cov_hdf_store
 
     # sample data, keep the relative and full values sampled for plotting later
@@ -354,6 +362,8 @@ def set_log_scale(ax, log_x, log_y):
         ax.set_xscale('log')
     if log_y:
         ax.set_yscale('log')
+
+
 def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zaid_2=None, mt_2=None, output_base='',
                       log_x=True, log_y=True, log_y_stddev=False):
     """
@@ -377,9 +387,18 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     # plot the cov
     xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
 
+    e_for_plot = list(xsec['e high'])
+    e_for_plot.append(e_for_plot[-1] / 2)
+
+    y_for_plot = list(xsec['s.d.(1)'] ** 2)
+    y_for_plot.append(y_for_plot[-1])
+
+    y2_for_plot = list(np.diag(np.cov(sample_df_full_vals)))
+    y2_for_plot.append(y2_for_plot[-1])
+
     fig, ax = plt.subplots()
-    ax.plot(xsec['e high'], xsec['s.d.(1)'] ** 2, drawstyle='steps-post', label='Diag(cov) ENDF')
-    ax.plot(xsec['e high'], np.diag(np.cov(sample_df_full_vals)), drawstyle='steps-post', label='Diag(cov) Sampled')
+    ax.plot(e_for_plot, y_for_plot, drawstyle='steps-post', label='Diag(cov) ENDF')
+    ax.plot(e_for_plot, y2_for_plot, drawstyle='steps-post', label='Diag(cov) Sampled')
     set_log_scale(ax, log_x, log_y)
 
     ax.legend()
@@ -406,11 +425,13 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
         ax.plot(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i],
                                                   min_e=xsec['e low'].min() - 1) * st, label=i)
 
-    ax.set_xlim([1e-3, 1.0])
-    ax.set_ylim([75, 125])
     # plot the base again so it appears on top
     ax.plot(e * 1e6, st, linestyle='-.', color='k')
-    set_log_scale(ax, log_x, False)
+
+    if max(st)/min(st) > 1000:
+        set_log_scale(ax, log_x, True)
+    else:
+        set_log_scale(ax, log_x, False)
 
     ax.legend(['Actual', 'Samples'])
 
@@ -420,21 +441,48 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     plt.savefig("{2}{3}{0}_{1}_few_sampled_xsec.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
 
     # Plot the corr matrix
-    fig, ax = plt.subplots(ncols=2, figsize=(8, 6))
-    cax = ax[0].matshow(corr.values)
-    fig.colorbar(cax, ax=ax[0], fraction=0.046, pad=0.04)
-    ax[0].set_xlabel('Group')
-    ax[0].xaxis.set_label_position('top')
-    ax[0].set_ylabel('Group')
+    e_for_corr = list(xsec['e high'])
+    e_for_corr.append(xsec['e low'].values[-1])
+    e_for_corr = e_for_corr[-1::-1]
+    X, Y = np.meshgrid(e_for_corr, e_for_corr)
 
-    ax[1].matshow(np.corrcoef(sample_df_full_vals))
-    fig.colorbar(cax, ax=ax[1], fraction=0.046, pad=0.04)
-    ax[1].set_xlabel('Group')
+    fig, ax = plt.subplots(ncols=2, figsize=(8, 6), sharey=True)
+
+    im = ax[0].pcolormesh(X, Y, corr.values)
+    ax[0].set_xscale('log')
+    ax[0].set_yscale('log')
+
+    ax[0].xaxis.tick_top()
+    ax[0].set_xlabel('Energy (eV)')
+    ax[0].set_ylabel('Energy (eV)')
+    ax[0].xaxis.set_label_position('top')
+
+    ax[0].set_xlim([e_for_corr[0], e_for_corr[-1]])
+    ax[0].set_ylim([e_for_corr[0], e_for_corr[-1]])
+
+    fig.colorbar(im, ax=ax[0], fraction=0.046, pad=0.04)
+    ax[0].set(adjustable='box', aspect='equal')
+
+
+    im = ax[1].pcolormesh(X, Y, np.corrcoef(sample_df_full_vals))
+    ax[1].set_xscale('log')
+    ax[1].set_yscale('log')
+
+    ax[1].xaxis.tick_top()
+    ax[1].set_xlabel('Energy (eV)')
     ax[1].xaxis.set_label_position('top')
-    ax[1].set_ylabel('Group')
+
+    ax[1].set_xlim([e_for_corr[0], e_for_corr[-1]])
+    ax[1].set_ylim([e_for_corr[0], e_for_corr[-1]])
+
+    fig.colorbar(im, ax=ax[1], fraction=0.046, pad=0.04)
+    ax[1].set(adjustable='box', aspect='equal')
+
+    plt.gca().invert_yaxis()
 
     fig.tight_layout()
-    plt.savefig("{2}{3}{0}_{1}_sampled_corr_compare.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
+    plt.savefig("{2}{3}{0}_{1}_sampled_corr_compare_log.eps".format(zaid, mt, output_base, os.path.sep),
+                bbox_inches='tight')
 
     plot_xsec(ace_file, h, zaid, mt, output_base, log_y_stddev=log_y_stddev)
 
@@ -482,7 +530,20 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, 
 
     # second plot (rel dev %)
     ax2 = fig.add_subplot(gs[1], sharex=ax)  # the above ax
-    ax2.plot(xsec['e high'], xsec['rel.s.d.(1)'] * 100, drawstyle='steps-post')
+
+    # check if lowest e is much higher than the plotted xsec so it looks okay
+    if e[0] * 1e6 < xsec['e high'].values[-1]:
+        e_for_plot = list(xsec['e high'])
+        e_for_plot.append(e[0] * 1e6)
+
+        y_for_plot = list(xsec['rel.s.d.(1)'] * 100)
+        y_for_plot.append(y_for_plot[-1])
+    else:
+        # do not need to add anything
+        e_for_plot = xsec['e high']
+        y_for_plot = xsec['rel.s.d.(1)'] * 100
+
+    ax2.plot(e_for_plot, y_for_plot, drawstyle='steps-post')
     set_log_scale(ax, log_x, log_y)
 
     ax2.set_xlabel('Energy (eV)')
@@ -553,21 +614,24 @@ if __name__ == "__main__":
 
     store_name = '../scale_cov_252.h5'
     store_name = '../u235_18_44_group.h5'
+    store_name = '../u238_102_3_group/u238_102_3g.h5'
     with pd.HDFStore(store_name, 'r') as h:
 
-        ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
-        zaid = 92235
-        mt = 102 #452
+        ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
+        zaid = 92238
+        mt = 102  #452
 
-        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 1000, sample_type='uncorrelated')
+        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 500, sample_type='lognorm')
 
         # output_base = '../run_cover_chain_test_out/'
-        output_base = '../u235_uncorrelated_18/'
+        output_base = '../u238_102_3_group/'
 
         plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True, log_y_stddev=False)
         #
-        write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u235_{0}')
+        # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
         #
+
+
         # ####
         #
         # sample_df, sample_df_full = sample_xsec(h, mt, zaid, 500, sample_type='uncorrelated')
