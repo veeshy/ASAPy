@@ -213,9 +213,9 @@ def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, 
     multi_group_val : pd.series
         multi_group_values with index as the group #
     max_e : float
-        Max energy where energies above this, multi_group_val set to zero
+        Max energy (eV) where energies above this, multi_group_val set to zero
     min_e : float
-        Min energy where energies below this, multi_group_val set to zero
+        Min energy (eV) where energies below this, multi_group_val set to zero
 
     Returns
     -------
@@ -236,9 +236,13 @@ def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, 
 
     for e in e_sigma_ev:
         # find where e_cont is in the groups
-        if e > max_e or e < min_e:
+        if e > max_e:
             # ensure we won't be below or above the bins
             grouped_dev.append(1)
+
+        elif e < min_e:
+            grouped_dev.append(num_groups)
+
         else:
             # searchsorted will return the index in the e_high list where
             # the e_cont would be if it was placed in the list then sorted
@@ -404,7 +408,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     ax.legend()
     ax.set_xlabel("Energy (eV)")
     ax.set_ylabel("Covariance")
-    plt.savefig("{2}{3}{0}_{1}_sampled_cov.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
+    plt.savefig("{2}{3}{0}_{1}_sampled_cov.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
 
     # Plot some xsec
     e, st = get_mt_from_ace(ace_file, zaid, mt)
@@ -423,7 +427,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
 
     for i in range(num_xsec):
         ax.plot(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i],
-                                                  min_e=xsec['e low'].min() - 1) * st, label=i)
+                                                  min_e=xsec['e low'].min()*0) * st, label=i)
 
     # plot the base again so it appears on top
     ax.plot(e * 1e6, st, linestyle='-.', color='k')
@@ -438,7 +442,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     ax.set_xlabel('Energy (Ev)')
     ax.set_ylabel('Cross Section (b)')
 
-    plt.savefig("{2}{3}{0}_{1}_few_sampled_xsec.eps".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight')
+    plt.savefig("{2}{3}{0}_{1}_few_sampled_xsec.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
 
     # Plot the corr matrix
     e_for_corr = list(xsec['e high'])
@@ -481,7 +485,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     plt.gca().invert_yaxis()
 
     fig.tight_layout()
-    plt.savefig("{2}{3}{0}_{1}_sampled_corr_compare_log.eps".format(zaid, mt, output_base, os.path.sep),
+    plt.savefig("{2}{3}{0}_{1}_sampled_corr_compare.png".format(zaid, mt, output_base, os.path.sep), dpi=450,
                 bbox_inches='tight')
 
     plot_xsec(ace_file, h, zaid, mt, output_base, log_y_stddev=log_y_stddev)
@@ -621,7 +625,7 @@ if __name__ == "__main__":
         zaid = 92238
         mt = 102  #452
 
-        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 500, sample_type='lognorm')
+        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 20, sample_type='lognorm')
 
         # output_base = '../run_cover_chain_test_out/'
         output_base = '../u238_102_3_group/'
