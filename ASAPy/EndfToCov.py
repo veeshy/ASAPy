@@ -325,11 +325,11 @@ if __name__ == "__main__":
     #     AsapyCovStorage.add_stddev_to_store(h, df, '1001', '102', '1001', '102')
 
     mt = 102
-    run_cover_chain("/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf", [mt], [300],
-                    output_dir='../run_cover_chain_test_out/',
-                    cov_energy_groups=njoy.energy_groups_238)
+    run_cover_chain("/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_238.endf", [mt], [300],
+                    output_dir='../u238_102_3_group/',
+                    cov_energy_groups=njoy.energy_groups_3)
 
-    rbo = read_boxer_out_matrix('../run_cover_chain_test_out/covr_300.txt_{mt}_matrix.txt'.format(mt=mt))
+    rbo = read_boxer_out_matrix('../u238_102_3_group/covr_300.txt_{mt}_matrix.txt'.format(mt=mt))
 
     group_bounds, xsec, std_dev, cov = rbo.get_block_data()
 
@@ -337,7 +337,7 @@ if __name__ == "__main__":
 
     with pd.HDFStore('test_put.h5', 'a') as h:
 
-        zaid = 92235
+        zaid = 92238
 
 
         df = AsapyCovStorage.create_corr_df(groups)

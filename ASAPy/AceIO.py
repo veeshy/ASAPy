@@ -363,4 +363,22 @@ class WriteAce:
                 f.write('\n')
 
 if __name__ == "__main__":
-    pass
+    import matplotlib.pyplot as plt
+
+    base_path = '/Users/veeshy/Downloads/U235.nuss.10.10.2016/'
+    fmt = 'U235-n.ace_{0}'
+
+    fig, ax = plt.subplots()
+
+    for idx in range(10):
+        from_ace = base_path + fmt.format(str(idx).zfill(4))
+
+        a = AceEditor(from_ace)
+        e = a.get_energy(18)
+        sigma = a.get_sigma(18)
+
+        ax.plot(e*1e6, sigma)
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+    plt.show()
+
