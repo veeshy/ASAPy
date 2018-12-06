@@ -2,6 +2,51 @@ import numpy as np
 import SALib.sample.latin as lhs
 from scipy.stats import multivariate_normal
 from scipy.stats.distributions import norm, uniform
+import scipy as sp
+from scipy.stats import norm as sci_norm
+from numpy.random import uniform as np_uniform
+
+"""
+IC Correlated Sampling from
+https://blakeboswell.github.io/article/2016/05/30/mc-parts.html
+
+including: col_independent_matrix, rank, order
+"""
+
+def col_independent_matrix(n, d):
+    """ return array with shape (n, d) where each
+        column is approximately independent
+    """
+    x = np.arange(1, (n+1))
+    p = sp.stats.norm.ppf(x/(n+1))
+    p = (p - p.mean()) / p.std()
+    score = np.zeros((n, d))
+    for j in range(0, score.shape[1]):
+        score[:, j] = np.random.permutation(p)
+    return score
+
+def rank(arr):
+    """ return the rank order of elements in array
+    """
+    n, k = arr.shape
+    rank = np.zeros((n, k))
+    for j in range(0, k):
+        rank[:, j] = sp.stats.rankdata(arr[:, j], method='ordinal')
+    return rank.astype(int) - 1
+
+
+def order(rank, samples):
+    """ order each column of samples according to rank
+    """
+    n, k = samples.shape
+    rank_samples = np.zeros((n, k))
+    for j in range(0, k):
+        s = np.sort(samples[:, j])
+        rank_samples[:, j] = s[rank[:, j]]
+    return rank_samples
+
+
+
 
 def correlation_to_cov(std, corr):
     """
@@ -51,7 +96,18 @@ def gmw_cholesky(A):
     """
     Provides a partial cholesky decomposition that is positive def minus a matrix e
 
-    Return `(P, L, e)` such that P*L = M ->  `MM.T = P.T*A*P = L*L.T - diag(e)`.
+    Return `(P, L, e)` such that P*L = M ->  `MM.T = P.T*A*P = L*L.T + diag(P*e)`
+
+    A snipped for some desired_corr matrix to show that reconstructed matricies agree and how
+    gmw cholesky is similar to numpy's cholesky. The intermediate steps are different because
+    there is not neccesarily unique lower triangular matricies.
+
+        P = np.linalg.cholesky(desired_corr)
+        cholesky_reconstructed = np.dot(P, P.T)
+
+        P, L, e = cm.gmw_cholesky(desired_corr)
+        C = np.dot(P, L)
+        gmw_cholesky_reconstructed = np.dot(C, C.T)
 
     Returns
     -------
@@ -226,15 +282,99 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, dist
 
     """
 
+    num_vars = len(mean_values)
+
+    # if possible, take cholesky decomposition else do gmw_cholesky with the idea that scipy cholesky is faster than gmw
+    try:
+        C = sp.linalg.cholesky(desired_corr)
+    except np.linalg.LinAlgError:
+        P, L, e = gmw_cholesky(desired_corr)
+        C = L.T
+
+    M = col_independent_matrix(num_samples, num_vars)
+    D = (1. / num_samples) * np.dot(M.T, M)
+
+    try:
+        E = sp.linalg.cholesky(D)
+    except np.linalg.LinAlgError:
+        P, L, e = gmw_cholesky(D)
+        E = L.T
+
+    N = np.dot(np.dot(M, np.linalg.inv(E)), C)
+    R = rank(N)
+
+    # in theory ANY distro can be used for each var, for easy of interface only one distribution is used here
+
+    distro = distro.lower()
+
+    # create a norm distro with mean/std_dev then sample from it using percent point func (inv of cdf percentiles)
+    if distro == 'norm':
+        distro_to_sample_from = sci_norm
+
+    elif distro == 'lognorm':
+        # using mu/sigma from wiki + the scipy convention of loc and scale to specify the mean and sigma
+        mean = [np.log(mean_values[i] / (1 + std_dev[i] ** 2 / mean_values[i] ** 2) ** 0.5) for i in range(num_vars)]
+        sigma = [(np.log(1 + std_dev[i] ** 2 / mean_values[i] ** 2)) ** 0.5 for i in range(num_vars)]
+
+        mean_values = mean
+        std_dev = sigma
+        distro_to_sample_from = sci_norm
+
+    elif distro == 'uniform':
+        distro_to_sample_from = uniform
+
+    else:
+        raise Exception("Distro {0} not supported at the moment, though all scipy distros should be usable.".format(distro))
+
+
+    dists = []
+    for var_num in range(num_vars):
+        dists.append([distro_to_sample_from.ppf(p, loc=mean_values[var_num], scale=std_dev[var_num]) for p in np_uniform(0.0, 1.0, num_samples)])
+
+    dists = np.array(dists)
+
+    # perform any post-processing
+    if distro == 'lognorm':
+        dists = np.exp(dists)
+
+    dists = order(R, dists.T)
+
+    return dists
+
+
+def __lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
+    """
+    Randomally samples from a normal-multivariate distribution using LHS while attempting to get the desired_cov
+
+    Parameters
+    ----------
+    mean_values
+    desired_cov
+    num_samples
+    distro : str
+        norm, lognorm (no proper handling of corr conversion)
+    Returns
+    -------
+
+    """
+
+    raise Exception("This method is deprecated please use lhs_normal_sample_corr")
+
     # draw samples in an uncorrelated manner
     num_vars = len(mean_values)
-    samples = lhs_uniform_sample(num_vars, num_samples)
+    samples = lhs_normal_sample(num_samples, np.zeros(num_vars), np.ones(num_vars))
+    # samples = lhs_uniform_sample(num_vars, num_samples)
 
     # cholesky-like decomp for non PD matricies.
     T = np.corrcoef(samples.T)
-    permutation, Q, e = gmw_cholesky(T)
+    # this decomposition might be right but it's used wrong..
+    # permutation, Q, e = gmw_cholesky(T)
 
-    # this matrix has the same correlation as the desired RStar
+    Q = np.linalg.cholesky(T)
+
+    # this matrix has the same correlation as the desired RStar.
+    # It is known to be PD since any neg eigenvalues were removed already.
+    # this can be changed to using gmw_cholesky to be more general though.
     P = np.linalg.cholesky(desired_corr)
 
     dependent_samples = np.dot(samples, np.dot(P, np.linalg.inv(Q)).T)
@@ -275,19 +415,19 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, dist
             raise Exception('Could not order samples ae={0}'.format(ae))
 
     # zb are the uniform correlated samples, now transform them to desired
-
+    #
     # transform the uniform sample about the mean to the unit interval
     for i in range(num_vars):
         zb[:, i] = (zb[:, i] - min(zb[:, i]))
         zb[:, i] = zb[:, i] / max(zb[:, i])
 
-        slightly_lt0 = zb[:, i] <= 0.0 + 1e-5
-        slightly_gt1 = zb[:, i] >= 1.0 - 1e-5
+        slightly_lt0 = zb[:, i] <= 0.0  # + 1e-5
+        slightly_gt1 = zb[:, i] >= 1.0  # - 1e-5
 
-        zb[slightly_lt0, i] = 1e-5
-        zb[slightly_gt1, i] = 1.0 - 1e-5
+        zb[slightly_lt0, i] = 1e-10  # 1e-5
+        zb[slightly_gt1, i] = 1-1e-10  # 1.0 - 1e-5
 
-    distro  = distro.lower()
+    distro = distro.lower()
 
     # using the desired distro's ppf, sample the distro with the correlated uniform sample
     for i in range(num_vars):
@@ -322,8 +462,9 @@ if __name__ == "__main__":
     # plt.imshow(np.corrcoef(dependent_samples.T))
     # plt.colorbar()
     # plt.show()
-    a = np.array([[4, 2, 1], [2, 6, 3], [1, 3, -0.004]])
-    p,r,e = gmw_cholesky(a)
-    #print(np.dot(np.dot(p, a), p.T))
-    m = np.dot(p, r)
-    print(np.dot(m, m.T))
+    # a = np.array([[4, 2, 1], [2, 6, 3], [1, 3, -0.004]])
+    # p,r,e = gmw_cholesky(a)
+    # #print(np.dot(np.dot(p, a), p.T))
+    # m = np.dot(p, r)
+    # print(np.dot(m, m.T))
+    pass

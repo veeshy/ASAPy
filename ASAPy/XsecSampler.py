@@ -82,7 +82,7 @@ class XsecSampler:
 
 
 
-    def sample(self, sample_type, n, raise_on_bad_sample=False, remove_neg=True, return_relative=True,
+    def sample(self, sample_type, num_samples, raise_on_bad_sample=False, remove_neg=True, return_relative=True,
                set_neg_to_zero=False):
         """
         Samples using LHS
@@ -91,7 +91,7 @@ class XsecSampler:
         ----------
         sample_type : str
             'norm' or 'lognorm' or 'uncorrelated' to perform multi-variate sampling using these distros
-        n : int
+        num_samples : int
             Number of samples
         raise_on_bad_sample : bool
             Option to raise if a negative sample is found
@@ -107,22 +107,23 @@ class XsecSampler:
             Relative sample (sample / original group mean value) (groups x n)
         """
 
-        over_sample_n = n * 2
-
         if sample_type.lower() == 'norm':
             samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
                                                              self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
-                                                             over_sample_n, distro='norm')
+                                                             num_samples, distro='norm')
         elif sample_type.lower() == 'lognorm':
             samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
                                                              self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
-                                                             over_sample_n, distro='lognorm')
+                                                             num_samples, distro='lognorm')
         elif sample_type.lower() == 'uncorrelated':
             # use a correlation of diag(1)
             samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
                                                              self.std_dev_df['s.d.(1)'].values, np.diag(np.ones(len(self.std_dev_df['x-sec(1)'].values))),
-                                                             over_sample_n, distro='lognorm')
-
+                                                             num_samples, distro='lognorm')
+        elif sample_type.lower() == 'uniform':
+            samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
+                                                             self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
+                                                             num_samples, distro='uniform')
         else:
             raise Exception('Sampling type: {0} not implimented'.format(sample_type))
 
@@ -136,22 +137,17 @@ class XsecSampler:
 
         if set_neg_to_zero:
             samples[samples < 0] = 0
-        else:
-            num_samples_worked = samples.shape[1]
-            # over sample to make sure we don't get negative samples.
-            # todo: this should be reworked to not oversample in log normal, or when negative samples are fine
-            if num_samples_worked < n:
-                if not raise_on_bad_sample:
-                    # try again with bigger n
-                    samples = self.sample(sample_type, over_sample_n, raise_on_bad_sample=True,
-                                          remove_neg=remove_neg, return_relative=return_relative)
-                else:
-                    raise Exception(
-                        'Tried twice to get {0} samples, only was able to make {1}'.format(n / 2, num_samples_worked))
 
-        # grab only n samples
-        samples = samples.iloc[:, 0:n]
-        # number samples from 0 to n
+        num_samples_worked = samples.shape[1]
+
+        if num_samples_worked < num_samples:
+            if not raise_on_bad_sample:
+                samples = self.sample(sample_type, num_samples, raise_on_bad_sample=True,
+                                      remove_neg=remove_neg, return_relative=return_relative)
+            else:
+                raise Exception("Could not generate samples due to negative values created. Made {0} of the desired {1}".format(num_samples_worked, num_samples))
+
+        # number samples from 0 to num_samples
         samples = samples.T.reset_index(drop=True).T
 
         return samples
@@ -197,11 +193,12 @@ class XsecSampler:
             print('eig_replace: created eig', min(LA.eigvals(fixed_corr)))
         else:
             fixed_corr = corr_matrix
+            print('No eigen replacement needed for corr matrix')
 
         return fixed_corr
 
 
-def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, min_e=None):
+def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, min_e=None, value_outside_of_range=1):
     """
     Maps the grouped multi_group_val onto the sigma based on the continuous energy e_sigma
     Parameters
@@ -213,9 +210,13 @@ def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, 
     multi_group_val : pd.series
         multi_group_values with index as the group #
     max_e : float
-        Max energy (eV) where energies above this, multi_group_val set to zero
+        Max energy (eV) where energies above this, multi_group_val set to 1.0 (no sampling).
+        Energies below this max_e and above the max(high_e_bins) are treated as if they are in the highest energy bin)
     min_e : float
-        Min energy (eV) where energies below this, multi_group_val set to zero
+        Min energy (eV) where energies below this, multi_group_val set to 1.0 (no sampling)
+        Energies above this min_e and below the min(high_e_bins) are treated as if they are in the lowest energy bin)
+    value_outside_of_range : float
+        Value to fill if the mapping would be out of the range [min_e, max_e]
 
     Returns
     -------
@@ -228,42 +229,70 @@ def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, 
         min_e = min(high_e_bins) / 10
         warn("Min e set to {0} eV since it was not provided".format(min_e))
 
-    num_groups = len(high_e_bins)
+    if np.equal(min_e, min(high_e_bins.values)):
+        raise Exception("Min e bin should be lower than the lowest high_e_bin")
 
+    num_groups = len(high_e_bins)
     grouped_dev = []
-    sorted_e = sorted(high_e_bins.values)
+
+    # create bins so that they are actually bins and not just end points of the bins by adding the lowest end point
+    e_bins_to_map_to = list(high_e_bins.values)
+    e_bins_to_map_to.append(min_e)
+    if not np.equal(e_bins_to_map_to[0], max_e):
+        if max_e < e_bins_to_map_to[0]:
+            raise Exception("Max e bin should be greater than or equal to the max high_e_bin")
+
+        e_bins_to_map_to[0] = max_e
+
+    sorted_e = sorted(e_bins_to_map_to)
     e_sigma_ev = e_sigma * 1e6
 
-    for e in e_sigma_ev:
-        # find where e_cont is in the groups
-        if e > max_e:
-            # ensure we won't be below or above the bins
-            grouped_dev.append(1)
+    # locate where the e to map from is below the min and max bounds so they can be changed to the desired value after searching for indicies
+    bins_too_low = np.where(e_sigma_ev < min_e)
+    bins_too_high = np.where(e_sigma_ev > max_e)
 
-        elif e < min_e:
-            grouped_dev.append(num_groups)
+    bins = np.searchsorted(sorted_e, e_sigma_ev)
 
-        else:
-            # searchsorted will return the index in the e_high list where
-            # the e_cont would be if it was placed in the list then sorted
-            # this index is the same as the group # we are in
-            idx = np.searchsorted(sorted_e, e)
-            # convert idx to group # (since we sorted the E from low to high)
-            group_num = num_groups - idx + 1  # -> idx 252 is group 1, idx 1 is group 252 (can't have idx 0 by design)
+    # map to actual group number
+    group_nums = 1 + num_groups - bins
+    # for now replace the too low and too high bins with nearest good bin. Later they will be overwritten to user value
+    # this makes it easier to index indo multi_group_val
+    group_nums[bins_too_low] = num_groups
+    group_nums[bins_too_high] = 1
 
-            # do not sample if above the cov bins
-            if group_num > num_groups:
-                grouped_dev.append(1)
-                continue
+    std_dev_mapped_to_e_groups = multi_group_val[group_nums].values
 
-            if group_num < 1:
-                grouped_dev.append(1)
-                continue
+    std_dev_mapped_to_e_groups[bins_too_low] = value_outside_of_range
+    std_dev_mapped_to_e_groups[bins_too_high] = value_outside_of_range
 
-            sd = multi_group_val[group_num]
-            grouped_dev.append(sd)
+    # old logic for grouping
+    # for e in e_sigma_ev:
+    #     # find where e_cont is in the groups
+    #
+    #     # if above (below) max (min), assume no std_dev will be mapped
+    #     if e > max_e or e < min_e:
+    #         grouped_dev.append(value_outside_of_range)
+    #
+    #     else:
+    #         # searchsorted will return the index in the e_high list where
+    #         # the e_cont would be if it was placed in the list then sorted
+    #         # this index is the same as the group # we are in
+    #         idx = np.searchsorted(sorted_e, e)
+    #         # convert idx to group # (since we sorted the E from low to high)
+    #         group_num = num_groups - idx + 1  # -> idx 252 is group 1, idx 1 is group 252 (can't have idx 0 by design)
+    #
+    #         # if we are in a bin that is above the min e (below the max e), sample given the min e bin (max e bin)
+    #         if group_num > num_groups:
+    #             group_num = num_groups
+    #
+    #         if group_num < 1:
+    #             group_num = 1
+    #
+    #         sd = multi_group_val[group_num]
+    #         grouped_dev.append(sd)
 
-    return np.array(grouped_dev)
+
+    return std_dev_mapped_to_e_groups
 
 
 def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', remove_neg=False):
@@ -416,7 +445,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     fig, ax = plt.subplots()
 
     # ensure we don't try to plot too many samples
-    num_xsec = 20
+    num_xsec = 10
 
     # if less than num_xsec samples, plot all of them
     if num_xsec > sample_df.shape[1]:
@@ -427,7 +456,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
 
     for i in range(num_xsec):
         ax.plot(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i],
-                                                  min_e=xsec['e low'].min()*0) * st, label=i)
+                                                  min_e=xsec['e low'].min()) * st, label=i)
 
     # plot the base again so it appears on top
     ax.plot(e * 1e6, st, linestyle='-.', color='k')
@@ -489,6 +518,10 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
                 bbox_inches='tight')
 
     plot_xsec(ace_file, h, zaid, mt, output_base, log_y_stddev=log_y_stddev)
+
+    print(corr.values)
+
+    print(np.corrcoef(sample_df_full_vals))
 
 
 def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, log_x=True, log_y=True, log_y_stddev=False):
@@ -609,7 +642,7 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
     sample_df_rel.insert(0, 'e low', xsec['e low'])
     sample_df_rel.insert(1, 'e high', xsec['e high'])
     sample_df_rel.insert(2, 'xsec', xsec['x-sec(1)'])
-    sample_df_rel.insert(3, 'std', xsec['rel.s.d.(1)'])
+    sample_df_rel.insert(3, 'rel std', xsec['rel.s.d.(1)'])
     sample_df_rel.to_csv('{0}_samples.csv'.format(output_formatter.format('data')))
 
 
@@ -625,7 +658,7 @@ if __name__ == "__main__":
         zaid = 92238
         mt = 102  #452
 
-        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 20, sample_type='lognorm')
+        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 1000, sample_type='lognorm')
 
         # output_base = '../run_cover_chain_test_out/'
         output_base = '../u238_102_3_group/'
