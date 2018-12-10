@@ -519,10 +519,6 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
 
     plot_xsec(ace_file, h, zaid, mt, output_base, log_y_stddev=log_y_stddev)
 
-    print(corr.values)
-
-    print(np.corrcoef(sample_df_full_vals))
-
 
 def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, log_x=True, log_y=True, log_y_stddev=False):
     """
