@@ -398,7 +398,7 @@ def set_log_scale(ax, log_x, log_y):
 
 
 def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zaid_2=None, mt_2=None, output_base='',
-                      log_x=True, log_y=True, log_y_stddev=False):
+                      log_x=True, log_y=True, log_y_stddev=False, corr_rel_diff=False):
     """
     Plots diag of cov, a few xsecs, and full corr matrix of the sampled data
     Parameters
@@ -416,6 +416,10 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
         True to set axis scale to log
     log_y : bool
         True to set axis scale to log
+    log_y_stddev : bool
+        True to set std dev plot to log y axis
+    corr_rel_diff : bool
+        True to output original corr matrix and abs value of the difference of sampled corr and original
     """
     # plot the cov
     xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
@@ -496,8 +500,10 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     fig.colorbar(im, ax=ax[0], fraction=0.046, pad=0.04)
     ax[0].set(adjustable='box', aspect='equal')
 
-
-    im = ax[1].pcolormesh(X, Y, np.corrcoef(sample_df_full_vals))
+    if corr_rel_diff:
+        im = ax[1].pcolormesh(X, Y, np.abs(np.corrcoef(sample_df_full_vals) - corr.values))
+    else:
+        im = ax[1].pcolormesh(X, Y, np.corrcoef(sample_df_full_vals))
     ax[1].set_xscale('log')
     ax[1].set_yscale('log')
 
@@ -647,21 +653,24 @@ if __name__ == "__main__":
 
     store_name = '../scale_cov_252.h5'
     store_name = '../u235_18_44_group.h5'
-    store_name = '../u238_102_3_group/u238_102_3g.h5'
+    # store_name = '../u238_102_3_group/u238_102_3g.h5'
+
     with pd.HDFStore(store_name, 'r') as h:
 
-        ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
-        zaid = 92238
+        #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
+        ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
+        zaid = 92235
         mt = 102  #452
 
         sample_df, sample_df_full = sample_xsec(h, mt, zaid, 1000, sample_type='lognorm')
 
         # output_base = '../run_cover_chain_test_out/'
-        output_base = '../u238_102_3_group/'
+        output_base = '../u235_correlated_102/'
+        os.makedirs(output_base, exist_ok=True)
 
         plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True, log_y_stddev=False)
         #
-        # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
+        write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
         #
 
 

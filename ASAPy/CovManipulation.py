@@ -284,6 +284,26 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, dist
 
     num_vars = len(mean_values)
 
+    if distro=='lognorm':
+        # according to
+        # G. Zerovnik, et. al. Transformation of correlation coefficients between normal and lognormal distribution and implications for nuclear applications
+        # we must treat the assumed correlations to be normal and transform them to lognormal to sample correclty
+        # Large anti and positive correlations along with large relative uncertainties are not allowed for log normal
+
+        print("Adjust cov from assumed normal to lognormal via G. Zerovnik")
+        log_corr = np.zeros(desired_corr.shape)
+
+        for i in range(len(log_corr)):
+            for j in range(len(log_corr)):
+                log_corr[i, j] = mean_values[i] * mean_values[j] / (std_dev[i] * std_dev[j]) * (np.exp(desired_corr[i, j] * np.sqrt(np.log(std_dev[i]**2 / mean_values[i]**2 + 1) * np.log(std_dev[j]**2 / mean_values[j]**2 + 1))) - 1)
+
+        diff = np.abs(log_corr - desired_corr) / np.abs(desired_corr)
+        diff[np.isnan(diff)] = 0
+        diff = diff.sum().sum() / len(log_corr)**2
+        print("||(Log(corr) - original) / original||) =", diff)
+        desired_corr = log_corr
+
+
     # if possible, take cholesky decomposition else do gmw_cholesky with the idea that scipy cholesky is faster than gmw
     try:
         C = sp.linalg.cholesky(desired_corr)
