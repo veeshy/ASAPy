@@ -9,13 +9,13 @@ from warnings import warn
 import numpy as np
 from uncertainties import ufloat, unumpy, UFloat
 
-import checkvalue as cv
-from mixin import EqualityMixin
-from data import ATOMIC_SYMBOL, ATOMIC_NUMBER
-from endf import Evaluation, get_head_record, get_list_record, get_tab1_record
+from . import checkvalue as cv
+from .mixin import EqualityMixin
+from .data import ATOMIC_SYMBOL, ATOMIC_NUMBER
+from .endf import Evaluation, get_head_record, get_list_record, get_tab1_record
 
 
-# Gives name and (change in A, change in Z) resulting from decay
+# Gives name and (change in A, change in Z) resulting from .decay
 _DECAY_MODES = {
     0: ('gamma', (0, 0)),
     1: ('beta-', (0, 1)),
@@ -193,7 +193,7 @@ class DecayMode(EqualityMixin):
     branching_ratio : uncertainties.UFloat
         Fraction of the decay of the parent nuclide which proceeds by this mode.
     daughter : str
-        Name of daughter nuclide produced from decay
+        Name of daughter nuclide produced from .decay
     energy : uncertainties.UFloat
         Total decay energy in eV available in the decay process.
     modes : list of str

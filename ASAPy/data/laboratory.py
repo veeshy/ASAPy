@@ -3,11 +3,11 @@ from numbers import Real, Integral
 
 import numpy as np
 
-import checkvalue as cv
-from univariate import Tabular, Univariate, Discrete, Mixture
-from angle_energy import AngleEnergy
-from function import INTERPOLATION_SCHEME
-from endf import get_tab2_record, get_tab1_record
+from . import checkvalue as cv
+from .univariate import Tabular, Univariate, Discrete, Mixture
+from .angle_energy import AngleEnergy
+from .function import INTERPOLATION_SCHEME
+from .endf import get_tab2_record, get_tab1_record
 
 
 class LaboratoryAngleEnergy(AngleEnergy):

@@ -3,9 +3,9 @@ from numbers import Integral, Real
 
 import numpy as np
 
-import checkvalue as cv
-from mixin import EqualityMixin
-from data import EV_PER_MEV
+from . import checkvalue as cv
+from .mixin import EqualityMixin
+from .data import EV_PER_MEV
 
 
 class ProbabilityTables(EqualityMixin):

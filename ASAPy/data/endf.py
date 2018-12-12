@@ -17,9 +17,9 @@ from collections.abc import Iterable
 import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 
-from data import ATOMIC_SYMBOL, gnd_name
-from function import Tabulated1D, INTERPOLATION_SCHEME
-from univariate import Uniform, Tabular, Legendre
+from .data import ATOMIC_SYMBOL, gnd_name
+from .function import Tabulated1D, INTERPOLATION_SCHEME
+from .univariate import Uniform, Tabular, Legendre
 
 
 _LIBRARY = {0: 'ENDF/B', 1: 'ENDF/A', 2: 'JEFF', 3: 'EFF',

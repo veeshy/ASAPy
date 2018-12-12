@@ -12,24 +12,21 @@ from warnings import warn
 import numpy as np
 import h5py
 
-from ace import Library, Table, get_table, get_metadata
-from data import ATOMIC_SYMBOL, K_BOLTZMANN, EV_PER_MEV
-from endf import Evaluation, SUM_RULES, get_head_record, get_tab1_record
-from fission_energy import FissionEnergyRelease
-from function import Tabulated1D, Sum, ResonancesWithBackground
-from grid import linearize, thin
-from njoy import make_ace
-from product import Product
-from reaction import Reaction, _get_photon_products_ace
-import resonance as res
-import resonance_covariance as res_cov
-from urr import ProbabilityTables
-import checkvalue as cv
-from mixin import EqualityMixin
-
-HDF5_VERSION_MAJOR = 2
-HDF5_VERSION_MINOR = 0
-HDF5_VERSION = (HDF5_VERSION_MAJOR, HDF5_VERSION_MINOR)
+from .ace import Library, Table, get_table, get_metadata
+from .data import ATOMIC_SYMBOL, K_BOLTZMANN, EV_PER_MEV
+from .endf import Evaluation, SUM_RULES, get_head_record, get_tab1_record
+from .fission_energy import FissionEnergyRelease
+from .function import Tabulated1D, Sum, ResonancesWithBackground
+from .grid import linearize, thin
+from .njoy import make_ace
+from .product import Product
+from .reaction import Reaction, _get_photon_products_ace
+from . import resonance as res
+from . import resonance_covariance as res_cov
+from .urr import ProbabilityTables
+from . import checkvalue as cv
+from .mixin import EqualityMixin
+from . import HDF5_VERSION, HDF5_VERSION_MAJOR
 
 # Fractions of resonance widths used for reconstructing resonances
 _RESONANCE_ENERGY_GRID = np.logspace(-3, 3, 61)

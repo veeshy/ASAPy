@@ -22,10 +22,10 @@ import sys
 
 import numpy as np
 
-from mixin import EqualityMixin
-import checkvalue as cv
-from data import ATOMIC_SYMBOL, gnd_name
-from endf import ENDF_FLOAT_RE
+from .mixin import EqualityMixin
+from . import checkvalue as cv
+from .data import ATOMIC_SYMBOL, gnd_name
+from .endf import ENDF_FLOAT_RE
 
 
 def get_metadata(zaid, metastable_scheme='nndc'):

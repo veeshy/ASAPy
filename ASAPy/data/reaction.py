@@ -6,23 +6,23 @@ from io import StringIO
 
 import numpy as np
 
-import checkvalue as cv
-from mixin import EqualityMixin
-from univariate import Uniform, Tabular, Legendre
-from angle_distribution import AngleDistribution
-from angle_energy import AngleEnergy
-from correlated import CorrelatedAngleEnergy
-from data import ATOMIC_SYMBOL, K_BOLTZMANN, EV_PER_MEV
-from endf import get_head_record, get_tab1_record, get_list_record, \
+from . import checkvalue as cv
+from .mixin import EqualityMixin
+from .univariate import Uniform, Tabular, Legendre
+from .angle_distribution import AngleDistribution
+from .angle_energy import AngleEnergy
+from .correlated import CorrelatedAngleEnergy
+from .data import ATOMIC_SYMBOL, K_BOLTZMANN, EV_PER_MEV
+from .endf import get_head_record, get_tab1_record, get_list_record, \
     get_tab2_record, get_cont_record
-from energy_distribution import EnergyDistribution, LevelInelastic, \
+from .energy_distribution import EnergyDistribution, LevelInelastic, \
     DiscretePhoton
-from function import Tabulated1D, Polynomial
-from kalbach_mann import KalbachMann
-from laboratory import LaboratoryAngleEnergy
-from nbody import NBodyPhaseSpace
-from product import Product
-from uncorrelated import UncorrelatedAngleEnergy
+from .function import Tabulated1D, Polynomial
+from .kalbach_mann import KalbachMann
+from .laboratory import LaboratoryAngleEnergy
+from .nbody import NBodyPhaseSpace
+from .product import Product
+from .uncorrelated import UncorrelatedAngleEnergy
 
 
 REACTION_NAME = {1: '(n,total)', 2: '(n,elastic)', 4: '(n,level)',
@@ -564,7 +564,7 @@ def _get_photon_products_ace(ace, rx):
     Returns
     -------
     photons : list of data.Products
-        Photons produced from reaction with given MT
+        Photons produced from .reaction with given MT
 
     """
     n_photon_reactions = ace.nxs[6]
@@ -662,7 +662,7 @@ def _get_photon_products_endf(ev, rx):
     Returns
     -------
     products : list of data.Products
-        Photons produced from reaction with given MT
+        Photons produced from .reaction with given MT
 
     """
     products = []

@@ -10,13 +10,13 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import CubicSpline
 
-from mixin import EqualityMixin
-import checkvalue as cv
-import HDF5_VERSION
-from ace import Table, get_metadata, get_table
-from data import ATOMIC_SYMBOL, EV_PER_MEV
-from endf import Evaluation, get_head_record, get_tab1_record, get_list_record
-from function import Tabulated1D
+from .mixin import EqualityMixin
+from . import checkvalue as cv
+from . import HDF5_VERSION
+from .ace import Table, get_metadata, get_table
+from .data import ATOMIC_SYMBOL, EV_PER_MEV
+from .endf import Evaluation, get_head_record, get_tab1_record, get_list_record
+from .function import Tabulated1D
 
 
 _SUBSHELLS = ['K', 'L1', 'L2', 'L3', 'M1', 'M2', 'M3', 'M4', 'M5',

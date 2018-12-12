@@ -1,8 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from io import StringIO
 
-import data
-from mixin import EqualityMixin
+from .mixin import EqualityMixin
 
 class AngleEnergy(EqualityMixin, metaclass=ABCMeta):
     """Distribution in angle and energy of a secondary particle."""
@@ -27,11 +26,11 @@ class AngleEnergy(EqualityMixin, metaclass=ABCMeta):
         """
         dist_type = group.attrs['type'].decode()
         if dist_type == 'uncorrelated':
-            return uncorrelated.UncorrelatedAngleEnergy.from_hdf5(group)
+            return UncorrelatedAngleEnergy.from_hdf5(group)
         elif dist_type == 'correlated':
-            return correlated.CorrelatedAngleEnergy.from_hdf5(group)
+            return CorrelatedAngleEnergy.from_hdf5(group)
         elif dist_type == 'kalbach-mann':
-            return kalbach_mann.KalbachMann.from_hdf5(group)
+            return KalbachMann.from_hdf5(group)
         elif dist_type == 'nbody':
             return NBodyPhaseSpace.from_hdf5(group)
 
@@ -69,32 +68,32 @@ class AngleEnergy(EqualityMixin, metaclass=ABCMeta):
 
         # Parse energy distribution data
         if law == 2:
-            distribution = uncorrelated.UncorrelatedAngleEnergy()
-            distribution.energy = energy_distribution.DiscretePhoton.from_ace(ace, idx)
+            distribution = UncorrelatedAngleEnergy()
+            distribution.energy = DiscretePhoton.from_ace(ace, idx)
         elif law in (3, 33):
-            distribution = uncorrelated.UncorrelatedAngleEnergy()
-            distribution.energy = energy_distribution.LevelInelastic.from_ace(ace, idx)
+            distribution = UncorrelatedAngleEnergy()
+            distribution.energy = LevelInelastic.from_ace(ace, idx)
         elif law == 4:
-            distribution = uncorrelated.UncorrelatedAngleEnergy()
-            distribution.energy = energy_distribution.ContinuousTabular.from_ace(
+            distribution = UncorrelatedAngleEnergy()
+            distribution.energy = ContinuousTabular.from_ace(
                 ace, idx, location_dist)
         elif law == 5:
-            distribution = uncorrelated.UncorrelatedAngleEnergy()
+            distribution = UncorrelatedAngleEnergy()
             distribution.energy = GeneralEvaporation.from_ace(ace, idx)
         elif law == 7:
-            distribution = uncorrelated.UncorrelatedAngleEnergy()
+            distribution = UncorrelatedAngleEnergy()
             distribution.energy = MaxwellEnergy.from_ace(ace, idx)
         elif law == 9:
-            distribution = uncorrelated.UncorrelatedAngleEnergy()
+            distribution = UncorrelatedAngleEnergy()
             distribution.energy = Evaporation.from_ace(ace, idx)
         elif law == 11:
-            distribution = uncorrelated.UncorrelatedAngleEnergy()
+            distribution = UncorrelatedAngleEnergy()
             distribution.energy = WattEnergy.from_ace(ace, idx)
         elif law == 44:
-            distribution = kalbach_mann.KalbachMann.from_ace(
+            distribution = KalbachMann.from_ace(
                 ace, idx, location_dist)
         elif law == 61:
-            distribution = correlated.CorrelatedAngleEnergy.from_ace(
+            distribution = CorrelatedAngleEnergy.from_ace(
                 ace, idx, location_dist)
         elif law == 66:
             distribution = NBodyPhaseSpace.from_ace(
@@ -105,8 +104,8 @@ class AngleEnergy(EqualityMixin, metaclass=ABCMeta):
 
         return distribution
 
-# get around cyclic dependencies the lazy way!
-import kalbach_mann 
-import uncorrelated
-import energy_distribution
-import correlated
+from .uncorrelated import UncorrelatedAngleEnergy
+from .correlated import CorrelatedAngleEnergy
+from .kalbach_mann import KalbachMann
+from .nbody import NBodyPhaseSpace
+from .energy_distribution import ContinuousTabular, Evaporation, WattEnergy, LevelInelastic, DiscretePhoton, MaxwellEnergy, GeneralEvaporation

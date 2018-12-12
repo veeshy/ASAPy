@@ -7,9 +7,9 @@ from numbers import Real, Integral
 import numpy as np
 
 import data
-import checkvalue as cv
-from mixin import EqualityMixin
-from data import EV_PER_MEV
+from . import checkvalue as cv
+from .mixin import EqualityMixin
+from .data import EV_PER_MEV
 
 INTERPOLATION_SCHEME = {1: 'histogram', 2: 'linear-linear', 3: 'linear-log',
                         4: 'log-linear', 5: 'log-log'}
@@ -86,7 +86,7 @@ class Function1D(EqualityMixin, metaclass=ABCMeta):
         Returns
         -------
         Function1D
-            Function read from dataset
+            Function read from .dataset
 
         """
         for subclass in cls.__subclasses__():
@@ -342,7 +342,7 @@ class Tabulated1D(Function1D):
         Returns
         -------
         Tabulated1D
-            Function read from dataset
+            Function read from .dataset
 
         """
         if dataset.attrs['type'].decode() != cls.__name__:
@@ -428,7 +428,7 @@ class Polynomial(np.polynomial.Polynomial, Function1D):
         Returns
         -------
         Function1D
-            Function read from dataset
+            Function read from .dataset
 
         """
         if dataset.attrs['type'].decode() != cls.__name__:

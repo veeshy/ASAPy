@@ -6,11 +6,11 @@ import sys
 import h5py
 import numpy as np
 
-from data import EV_PER_MEV
-from endf import get_cont_record, get_list_record, get_tab1_record, Evaluation
-from function import Function1D, Tabulated1D, Polynomial, sum_functions
-import checkvalue as cv
-from mixin import EqualityMixin
+from .data import EV_PER_MEV
+from .endf import get_cont_record, get_list_record, get_tab1_record, Evaluation
+from .function import Function1D, Tabulated1D, Polynomial, sum_functions
+from . import checkvalue as cv
+from .mixin import EqualityMixin
 
 
 _NAMES = (

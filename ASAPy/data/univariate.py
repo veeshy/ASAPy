@@ -6,8 +6,8 @@ from xml.etree import ElementTree as ET
 
 import numpy as np
 
-import checkvalue as cv
-from mixin import EqualityMixin
+from . import checkvalue as cv
+from .mixin import EqualityMixin
 
 
 _INTERPOLATION_SCHEMES = ['histogram', 'linear-linear', 'linear-log',

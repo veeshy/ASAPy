@@ -1,30 +1,49 @@
 import re
-from pyne import ace
+from ASAPy.data import neutron
 import numpy as np
 import os
 
 class AceEditor:
     """
-    Loads a table from an ace file. If there is only one table, loads that table
+    Loads a table from an ace file. If there is only one table, loads that table.
+
+    Uses openmc data readers as backend, the openmc reader is much more powerful but we only need a subset of the reader so it lives in this class
+
+    Parameters
+    ----------
+    ace_path : str
+    temperature : str or float
+        The temperature to get from the ace file, str ends with K or float will get K added to it, must be exactly what is on the ace file
+
+
     """
 
-    def __init__(self, ace_path, specific_table=None):
+    def __init__(self, ace_path, temperature=None):
+
         ace_path = os.path.expanduser(ace_path)
-        libFile = ace.Library(ace_path)
-        libFile.read()
 
-        if specific_table:
-            table = libFile.find_table(specific_table)
+        self.table = neutron.IncidentNeutron.from_ace(ace_path)
+
+
+        temperatures = self.table.temperatures
+        if not temperature:
+            if len(temperatures) > 1:
+                raise Exception('Multiple temperature found, please specify temperature')
+            else:
+                temperature = temperatures[0]
         else:
-            tables = libFile.tables
-            if len(tables) > 1:
-                raise Exception('Multiple libraries found, please specify specific_table')
+            temperature = str(temperature)
+            if not temperature.endswith('K'):
+                # try to see if the user left off "K"
+                temperature += 'K'
 
-            table = libFile.find_table(list(tables.keys())[0])
+            if temperature not in list(temperature):
+                raise Exception("Could not find temperature {0} in ace file".format(temperature))
+
+        self.temperature = temperature
 
         self.ace_path = ace_path
-        self.table = table
-        self.all_mts = self.table.reactions.keys()
+        self.all_mts = list(self.table.reactions.keys())
         # store the original sigma so it will be easy to retrieve it later
         self.original_sigma = {}
         self.adjusted_mts = set()
@@ -47,7 +66,7 @@ class AceEditor:
         if mt in [452]:
             energy, _ = self.get_nu_distro()
         else:
-            energy = self.table.energy
+            energy = self.table.energy[self.temperature]
 
         return energy
 
@@ -139,12 +158,11 @@ class AceEditor:
         if mt in [452]:
             _, sigma = self.get_nu_distro()
         else:
-            rx = self.table.find_reaction(mt)
-
-            if rx is None:
-                raise ValueError("MT {mt} not present in this ace file {ace}".format(mt=mt, ace=self.ace_path))
-
-            sigma = rx.sigma
+            try:
+                rx = self.table.reactions[mt].xs[self.temperature]
+            except KeyError:
+                raise KeyError("Could not find mt={0} in ace file".format(mt))
+            sigma = rx.y
 
         return sigma
 
@@ -168,7 +186,7 @@ class AceEditor:
         if mt in [452]:
             self.table.nu_t_value = sigma
         else:
-            self.table.find_reaction(mt).sigma = sigma
+            self.table.reactions[mt].xs[self.temperature].y = sigma
 
         self.adjusted_mts.add(mt)
 
@@ -363,22 +381,4 @@ class WriteAce:
                 f.write('\n')
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-    base_path = '/Users/veeshy/Downloads/U235.nuss.10.10.2016/'
-    fmt = 'U235-n.ace_{0}'
-
-    fig, ax = plt.subplots()
-
-    for idx in range(10):
-        from_ace = base_path + fmt.format(str(idx).zfill(4))
-
-        a = AceEditor(from_ace)
-        e = a.get_energy(18)
-        sigma = a.get_sigma(18)
-
-        ax.plot(e*1e6, sigma)
-        ax.set_xscale('log')
-        ax.set_yscale('log')
-    plt.show()
-
+    pass

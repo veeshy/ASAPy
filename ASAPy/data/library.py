@@ -3,9 +3,9 @@ import xml.etree.ElementTree as ET
 
 import h5py
 
-from mixin import EqualityMixin
-from _xml import clean_indentation
-from checkvalue import check_type
+from .mixin import EqualityMixin
+from ._xml import clean_indentation
+from .checkvalue import check_type
 
 
 class DataLibrary(EqualityMixin):

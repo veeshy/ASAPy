@@ -11,16 +11,16 @@ from warnings import warn
 import numpy as np
 import h5py
 
-import checkvalue as cv
-from mixin import EqualityMixin
-import HDF5_VERSION, HDF5_VERSION_MAJOR
-from data import K_BOLTZMANN, ATOMIC_SYMBOL, EV_PER_MEV, NATURAL_ABUNDANCE
-from ace import Table, get_table, Library
-from angle_energy import AngleEnergy
-from function import Tabulated1D
-from correlated import CorrelatedAngleEnergy
-from njoy import make_ace_thermal
-from univariate import Discrete, Tabular
+from . import checkvalue as cv
+from .mixin import EqualityMixin
+from . import HDF5_VERSION, HDF5_VERSION_MAJOR
+from .data import K_BOLTZMANN, ATOMIC_SYMBOL, EV_PER_MEV, NATURAL_ABUNDANCE
+from .ace import Table, get_table, Library
+from .angle_energy import AngleEnergy
+from .function import Tabulated1D
+from .correlated import CorrelatedAngleEnergy
+from .njoy import make_ace_thermal
+from .univariate import Discrete, Tabular
 
 
 _THERMAL_NAMES = {

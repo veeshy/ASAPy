@@ -6,9 +6,9 @@ import copy
 import numpy as np
 import pandas as pd
 
-import endf
-import checkvalue as cv
-from resonance import Resonances
+from . import endf
+from . import checkvalue as cv
+from .resonance import Resonances
 
 
 def _add_file2_contributions(file32params, file2params):

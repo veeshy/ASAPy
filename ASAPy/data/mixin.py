@@ -3,7 +3,7 @@ from warnings import warn
 
 import numpy as np
 
-import checkvalue as cv
+from . import checkvalue as cv
 
 
 class EqualityMixin(object):

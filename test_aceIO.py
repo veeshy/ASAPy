@@ -28,7 +28,7 @@ class TestAceEditor(TestCase):
         self.assertEqual(self.ace.adjusted_mts, {2})
 
     def test_non_existant_sigma(self):
-        self.assertRaises(ValueError, self.ace.get_sigma, 3)
+        self.assertRaises(KeyError, self.ace.get_sigma, -1)
 
     def test_set_sum(self):
         #TODO need to find a good test for this

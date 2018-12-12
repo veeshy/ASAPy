@@ -5,10 +5,10 @@ import sys
 
 import numpy as np
 
-import checkvalue as cv
-from mixin import EqualityMixin
-import angle_energy
-from function import Tabulated1D, Polynomial, Function1D
+from . import checkvalue as cv
+from .mixin import EqualityMixin
+from . import angle_energy
+from .function import Tabulated1D, Polynomial, Function1D
 
 
 class Product(EqualityMixin):

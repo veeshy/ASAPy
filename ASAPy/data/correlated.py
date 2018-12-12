@@ -4,13 +4,13 @@ from warnings import warn
 
 import numpy as np
 
-import checkvalue as cv
-from univariate import Tabular, Univariate, Discrete, Mixture, \
+from . import checkvalue as cv
+from .univariate import Tabular, Univariate, Discrete, Mixture, \
     Uniform, Legendre
-from function import INTERPOLATION_SCHEME
-from angle_energy import AngleEnergy
-from data import EV_PER_MEV
-from endf import get_list_record, get_tab2_record
+from .function import INTERPOLATION_SCHEME
+from .angle_energy import AngleEnergy
+from .data import EV_PER_MEV
+from .endf import get_list_record, get_tab2_record
 
 
 class CorrelatedAngleEnergy(AngleEnergy):

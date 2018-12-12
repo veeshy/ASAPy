@@ -5,12 +5,12 @@ from warnings import warn
 
 import numpy as np
 
-import checkvalue as cv
-from mixin import EqualityMixin
-from univariate import Univariate, Tabular, Uniform, Legendre
-from function import INTERPOLATION_SCHEME
-from data import EV_PER_MEV
-from endf import get_head_record, get_cont_record, get_tab1_record, \
+from . import checkvalue as cv
+from .mixin import EqualityMixin
+from .univariate import Univariate, Tabular, Uniform, Legendre
+from .function import INTERPOLATION_SCHEME
+from .data import EV_PER_MEV
+from .endf import get_head_record, get_cont_record, get_tab1_record, \
     get_list_record, get_tab2_record
 
 

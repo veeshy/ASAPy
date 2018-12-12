@@ -2,9 +2,9 @@ from numbers import Real, Integral
 
 import numpy as np
 
-import checkvalue as cv
-from angle_energy import AngleEnergy
-from endf import get_cont_record
+from . import checkvalue as cv
+from .angle_energy import AngleEnergy
+from .endf import get_cont_record
 
 class NBodyPhaseSpace(AngleEnergy):
     """N-body phase space distribution

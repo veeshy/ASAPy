@@ -6,15 +6,15 @@ import numpy as np
 from numpy.polynomial import Polynomial
 import pandas as pd
 
-from data import NEUTRON_MASS
-from endf import get_head_record, get_cont_record, get_tab1_record, get_list_record
+from .data import NEUTRON_MASS
+from .endf import get_head_record, get_cont_record, get_tab1_record, get_list_record
 try:
-    from reconstruct import wave_number, penetration_shift, reconstruct_mlbw, \
+    from .reconstruct import wave_number, penetration_shift, reconstruct_mlbw, \
         reconstruct_slbw, reconstruct_rm
     _reconstruct = True
 except ImportError:
     _reconstruct = False
-import checkvalue as cv
+from . import checkvalue as cv
 
 
 class Resonances(object):

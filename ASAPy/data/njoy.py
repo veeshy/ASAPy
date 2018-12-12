@@ -7,7 +7,7 @@ from subprocess import Popen, PIPE, STDOUT, CalledProcessError
 import sys
 import tempfile
 
-import endf
+from . import endf
 
 
 # For a given MAT number, give a name for the ACE table and a list of ZAID
