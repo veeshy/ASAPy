@@ -141,10 +141,11 @@ class XsecSampler:
         num_samples_worked = samples.shape[1]
 
         if num_samples_worked < num_samples:
-            if not raise_on_bad_sample:
-                samples = self.sample(sample_type, num_samples, raise_on_bad_sample=True,
-                                      remove_neg=remove_neg, return_relative=return_relative)
-            else:
+            # if not raise_on_bad_sample:
+            #     samples = self.sample(sample_type, num_samples, raise_on_bad_sample=True,
+            #                           remove_neg=remove_neg, return_relative=return_relative)
+            # else:
+            if raise_on_bad_sample:
                 raise Exception("Could not generate samples due to negative values created. Made {0} of the desired {1}".format(num_samples_worked, num_samples))
 
         # number samples from 0 to num_samples
@@ -294,8 +295,8 @@ def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, 
 
     return std_dev_mapped_to_e_groups
 
-
-def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', remove_neg=False):
+def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', remove_neg=False,
+                raise_on_bad_sample=False):
     """
     Samples the cov store for cross-section values based on the mat_num, mt, and sample type
 
@@ -330,7 +331,8 @@ def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', rem
     # sample data, keep the relative and full values sampled for plotting later
     xsec = XsecSampler(h, zaid, mt)
 
-    sample_df_full_vals = xsec.sample(sample_type, num_samples, return_relative=False, remove_neg=remove_neg)
+    sample_df_full_vals = xsec.sample(sample_type, num_samples, return_relative=False, remove_neg=remove_neg,
+                                      raise_on_bad_sample=raise_on_bad_sample)
     mean = xsec.std_dev_df['x-sec(1)'].values
     # get the full values by multiplying in the mean by having the internal sample checker "normalize" the values to the 1/mean
 
@@ -628,7 +630,7 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
     ae = AceIO.AceEditor(ace_file)
     e = ae.get_energy(mt)
     original_sigma = ae.get_sigma(mt)
-
+    #
     # sample_df contains relative values (sampled / mean) which are then multiplied by the actual continuous xsec and written to an ace file
     for idx, col in sample_df_rel.iteritems():
         # set the sigma in place
@@ -662,13 +664,23 @@ if __name__ == "__main__":
         zaid = 92235
         mt = 102  #452
 
-        sample_df, sample_df_full = sample_xsec(h, mt, zaid, 1000, sample_type='lognorm')
+        # num_samples_to_take is the nsamples that are actually written
+        # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
+        num_samples_to_take = 1000
+        num_samples_to_make = 1000
+
+        sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='norm', raise_on_bad_sample=False,
+                                                remove_neg=True)
+
+        sample_df = sample_df.iloc[:, 0:num_samples_to_take]
+        sample_df_full = sample_df_full.iloc[:, 0:num_samples_to_take]
 
         # output_base = '../run_cover_chain_test_out/'
         output_base = '../u235_correlated_102/'
         os.makedirs(output_base, exist_ok=True)
 
-        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True, log_y_stddev=False)
+        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True,
+                          log_y_stddev=False)
         #
         write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
         #
