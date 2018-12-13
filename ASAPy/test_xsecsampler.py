@@ -22,7 +22,7 @@ class TestMapGroups(TestCase):
         -------
 
         """
-        e_sigma = np.array([1e-22, 1e-8, 1e-3, 1e-2, 0.5, 1, 20, 27, 35])  # MeV
+        e_sigma = np.array([1e-22, 1e-8, 1e-3, 1e-2, 0.5, 1, 20, 27, 35]) * 1e6  # eV
         high_e_bins = pd.Series([25, 2.0, 1e-1, 1e-4, 1e-5]) * 1e6  # eV
         multi_group_val = pd.Series([1, 2, 3, 4, 5], index=[1,2,3,4,5])
         max_e = 30e6  # eV

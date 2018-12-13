@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.linalg as LA
-from pyne import ace
 from matplotlib import gridspec
 from matplotlib.ticker import FormatStrFormatter
 #
@@ -246,7 +245,7 @@ def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, 
         e_bins_to_map_to[0] = max_e
 
     sorted_e = sorted(e_bins_to_map_to)
-    e_sigma_ev = e_sigma * 1e6
+    e_sigma_ev = np.array(e_sigma)
 
     # locate where the e to map from is below the min and max bounds so they can be changed to the desired value after searching for indicies
     bins_too_low = np.where(e_sigma_ev < min_e)
@@ -340,15 +339,13 @@ def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', rem
 
     return sample_df, sample_df_full_vals
 
-def get_mt_from_ace(ace_file, zaid, mt):
+def get_mt_from_ace(ace_file, mt):
     """
     Loads mt from base_ace file
     Parameters
     ----------
     ace_file : str
         Path to ace file
-    zaid : int
-        The ZAID in the ace file
     mt : int
         The MT reaction number
 
@@ -370,13 +367,9 @@ def get_mt_from_ace(ace_file, zaid, mt):
             e, st = libFile.get_nu_distro()
 
     else:
-        libFile = ace.Library(ace_path)
-        libFile.read()
-        libFile.find_table(str(zaid))
-        xsec_tables = libFile.tables[list(libFile.tables.keys())[0]]
-
-        e = xsec_tables.energy
-        st = xsec_tables.find_reaction(mt).sigma
+        libFile = AceIO.AceEditor(ace_path)
+        e = libFile.get_energy(mt)
+        st = libFile.get_sigma(mt, at_energies=e)
 
     return e, st
 
@@ -446,7 +439,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     plt.savefig("{2}{3}{0}_{1}_sampled_cov.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
 
     # Plot some xsec
-    e, st = get_mt_from_ace(ace_file, zaid, mt)
+    e, st = get_mt_from_ace(ace_file, mt)
 
     fig, ax = plt.subplots()
 
@@ -458,14 +451,14 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
         num_xsec = sample_df.shape[1]
 
     # plot the base x-sec too
-    ax.plot(e * 1e6, st, linestyle='-.', color='k')
+    ax.plot(e, st, linestyle='-.', color='k')
 
     for i in range(num_xsec):
-        ax.plot(e * 1e6, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i],
+        ax.plot(e, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i],
                                                   min_e=xsec['e low'].min()) * st, label=i)
 
     # plot the base again so it appears on top
-    ax.plot(e * 1e6, st, linestyle='-.', color='k')
+    ax.plot(e, st, linestyle='-.', color='k')
 
     if max(st)/min(st) > 1000:
         set_log_scale(ax, log_x, True)
@@ -555,11 +548,11 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, 
     """
     # plot the xsec + the std_dev
     xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid, mt)
-    e, st = get_mt_from_ace(ace_file, zaid, mt)
+    e, st = get_mt_from_ace(ace_file, mt)
     fig = plt.figure(figsize=(6, 4))
     gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1.3])
     ax = fig.add_subplot(gs[0])
-    ax.plot(e * 1e6, st)
+    ax.plot(e, st)
     ax.grid(alpha=0.25)
     # turn off the x labels w/o turning off the grid x
     for tic in ax.xaxis.get_major_ticks():
@@ -573,9 +566,9 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, 
     ax2 = fig.add_subplot(gs[1], sharex=ax)  # the above ax
 
     # check if lowest e is much higher than the plotted xsec so it looks okay
-    if e[0] * 1e6 < xsec['e high'].values[-1]:
+    if e[0] < xsec['e high'].values[-1]:
         e_for_plot = list(xsec['e high'])
-        e_for_plot.append(e[0] * 1e6)
+        e_for_plot.append(e[0])
 
         y_for_plot = list(xsec['rel.s.d.(1)'] * 100)
         y_for_plot.append(y_for_plot[-1])
@@ -666,8 +659,8 @@ if __name__ == "__main__":
 
         # num_samples_to_take is the nsamples that are actually written
         # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
-        num_samples_to_take = 1000
-        num_samples_to_make = 1000
+        num_samples_to_take = 5
+        num_samples_to_make = num_samples_to_take
 
         sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='norm', raise_on_bad_sample=False,
                                                 remove_neg=True)

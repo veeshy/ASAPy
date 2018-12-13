@@ -2,6 +2,7 @@ import re
 from ASAPy.data import neutron
 import numpy as np
 import os
+import copy
 
 class AceEditor:
     """
@@ -14,7 +15,6 @@ class AceEditor:
     ace_path : str
     temperature : str or float
         The temperature to get from the ace file, str ends with K or float will get K added to it, must be exactly what is on the ace file
-
 
     """
 
@@ -59,7 +59,7 @@ class AceEditor:
         Returns
         -------
         list
-            Energies where mt is defined
+            Energies where mt is defined (eV)
 
         """
 
@@ -72,7 +72,7 @@ class AceEditor:
 
     def get_chi_distro(self, mt=18):
         """
-        Gets the energy distribution pyne object from mt for further processing.
+        Gets the energy distribution from mt.
 
         Gets the prompt chi
 
@@ -149,7 +149,7 @@ class AceEditor:
 
 
 
-    def get_sigma(self, mt):
+    def get_sigma(self, mt, at_energies=None):
         """
         Grabs sigma from the table
         Parameters
@@ -158,8 +158,8 @@ class AceEditor:
 
         Returns
         -------
-        pyne.ace.NeutronTable.sigma
-            Mutable nd.array
+        np.array
+            xsec values
 
         """
 
@@ -171,7 +171,11 @@ class AceEditor:
                 rx = self.table.reactions[mt].xs[self.temperature]
             except KeyError:
                 raise KeyError("Could not find mt={0} in ace file".format(mt))
-            sigma = rx.y
+
+            if at_energies is None:
+                sigma = copy.deepcopy(rx.y)
+            else:
+                sigma = copy.deepcopy(rx(at_energies))
 
         return sigma
 
@@ -244,8 +248,9 @@ class AceEditor:
 
         mt_1 = [2, *mt_3]  # contains 3 which is a sum
 
-        sum_mts_list = [mt_4, mt_16, mt_18, mt_103, mt_104, mt_105, mt_106, mt_107, mt_101, mt_27, mt_3, mt_1]
-        sum_mts = [4, 16, 18, 103, 104, 105, 106, 107, 101, 27, 3, 1]
+        # go from highest to lowest since lower ENDF #'s are not in higher #'s
+        sum_mts_list = [mt_107, mt_106, mt_105, mt_104, mt_103, mt_101, mt_27, mt_18, mt_16, mt_4, mt_3, mt_1]
+        sum_mts = [107, 106, 105, 104, 103, 101, 27, 18, 16, 4, 3, 1]
 
         for sum_mt, mts_in_sum in zip(sum_mts, sum_mts_list):
             # ensure the sum'd mt is present before trying to set it
@@ -257,7 +262,8 @@ class AceEditor:
 
                         if mt_adjusted_check:
                             # re-write this mt with the constituent mts summed
-                            sigmas = np.array([self.get_sigma(mt) for mt in sum_mts_present])
+                            energies = self.get_energy(1)
+                            sigmas = np.array([self.get_sigma(mt, at_energies=energies) for mt in sum_mts_present])
                             # sum all rows together
                             try:
                                 new_sum = sigmas.sum(axis=0)
@@ -266,7 +272,7 @@ class AceEditor:
                                                  "considered redundant, perhaps you don't need to apply the sum rule.\n\n"
                                                  "MTs in this sum that are in this ACE file:\n{1}".format(sum_mt, sum_mts_present))
                             self.set_sigma(sum_mt, new_sum)
-                            print("Adjusting {0} due to ENDF sum rules".format(sum_mt))
+                            # print("Adjusting MT={0} due to ENDF sum rules".format(sum_mt))
 
 
     def _check_if_mts_present(self, mt_list, compare_to=None):
