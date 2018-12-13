@@ -682,76 +682,75 @@ if __name__ == "__main__":
     from coupleorigen import qsub_helper
     import argparse
 
-    if __name__ == "__main__":
-        parser = create_argparser()
-        args = parser.parse_args()
+    parser = create_argparser()
+    args = parser.parse_args()
 
-        if args.writepbs:
-            pbs_args = {}
-            pbs_args['depends_on'] = args.waitforjob
+    if args.writepbs:
+        pbs_args = {}
+        pbs_args['depends_on'] = args.waitforjob
+
+        if args.make_plots:
+            make_plots = '--make_plots'
+        else:
+            make_plots = ''
+
+        if args.mpiproc > 1:
+            mpi_cmd = 'mpiexec -n {0} '.format(args.mpiproc)
+        else:
+            mpi_cmd = ''
+
+        python_to_run = mpi_cmd + 'python ' + os.path.abspath(__file__)
+
+
+        qsub_helper.qsub_helper('sample_xsec.sh', [python_to_run], [
+            "{0} {1} {2} {5} -distribution {3} -num_oversamples {4} {6}".format(args.base_ace, args.cov_store,
+                                                                                             args.mt, args.distribution,
+                                                                                             args.num_oversamples,
+                                                                                             args.num_samples, make_plots)],
+                                pbs_args=pbs_args, mpiprocs=args.mpiproc)
+
+        if args.subpbs:
+            os.system('qsub sample_xsec.sh')
+
+    else:
+
+        sample_choices = ['norm', 'lognorm']
+        if args.distribution.lower() not in sample_choices:
+            raise Exception("Unknown sample distribution {0}, please choose from {1}".format(args.distribution, sample_choices))
+
+        ace_file = args.base_ace
+        ace_data = AceIO.AceEditor(ace_file)
+        zaid = str(ace_data.table.atomic_number) + str(ace_data.table.mass_number)
+        mt = args.mt
+        atomic_symbol = ace_data.table.atomic_symbol
+
+        store_name = args.cov_store
+        num_samples_to_take = args.num_samples
+
+        if args.num_oversamples == -1:
+            num_samples_to_make = num_samples_to_take
+        else:
+            num_samples_to_make = args.num_oversamples
+
+        if num_samples_to_make < num_samples_to_take:
+            raise Exception("Cannot make more samples {0} than taking {1}".format(num_samples_to_make, num_samples_to_take))
+
+        with pd.HDFStore(os.path.expanduser(store_name), 'r') as h:
+            sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_take,
+                                                    num_samples_to_make=num_samples_to_make,
+                                                    sample_type=args.distribution, raise_on_bad_sample=False,
+                                                    remove_neg=True)
 
             if args.make_plots:
-                make_plots = '--make_plots'
-            else:
-                make_plots = ''
+                output_base = './'
+                # if we take user folder then we can make it like this..
+                # os.makedirs(output_base, exist_ok=True)
 
-            if args.mpiproc > 1:
-                mpi_cmd = 'mpiexec -n {0} '.format(args.mpiproc)
-            else:
-                mpi_cmd = ''
+                plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base,
+                                  log_y=True, log_y_stddev=False)
 
-            python_to_run = mpi_cmd + 'python ' + os.path.abspath(__file__)
-
-
-            qsub_helper.qsub_helper('sample_xsec.sh', [python_to_run], [
-                "{0} {1} {2} {5} -distribution {3} -num_oversamples {4} {6}".format(args.base_ace, args.cov_store,
-                                                                                                 args.mt, args.distribution,
-                                                                                                 args.num_oversamples,
-                                                                                                 args.num_samples, make_plots)],
-                                    pbs_args=pbs_args, mpiprocs=args.mpiproc)
-
-            if args.subpbs:
-                os.system('qsub sample_xsec.sh')
-
-        else:
-
-            sample_choices = ['norm', 'lognorm']
-            if args.distribution.lower() not in sample_choices:
-                raise Exception("Unknown sample distribution {0}, please choose from {1}".format(args.distribution, sample_choices))
-
-            ace_file = args.base_ace
-            ace_data = AceIO.AceEditor(ace_file)
-            zaid = str(ace_data.table.atomic_number) + str(ace_data.table.mass_number)
-            mt = args.mt
-            atomic_symbol = ace_data.table.atomic_symbol
-
-            store_name = args.cov_store
-            num_samples_to_take = args.num_samples
-
-            if args.num_oversamples == -1:
-                num_samples_to_make = num_samples_to_take
-            else:
-                num_samples_to_make = args.num_oversamples
-
-            if num_samples_to_make < num_samples_to_take:
-                raise Exception("Cannot make more samples {0} than taking {1}".format(num_samples_to_make, num_samples_to_take))
-
-            with pd.HDFStore(os.path.expanduser(store_name), 'r') as h:
-                sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_take,
-                                                        num_samples_to_make=num_samples_to_make,
-                                                        sample_type=args.distribution, raise_on_bad_sample=False,
-                                                        remove_neg=True)
-
-                if args.make_plots:
-                    output_base = './'
-                    # if we take user folder then we can make it like this..
-                    # os.makedirs(output_base, exist_ok=True)
-
-                    plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base,
-                                      log_y=True, log_y_stddev=False)
-
-                output_formatter = '{0}{1}_{2}'.format(atomic_symbol, ace_data.table.mass_number, mt)
-                write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + output_formatter + '_{0}')
+            output_formatter = '{0}{1}_{2}'.format(atomic_symbol, ace_data.table.mass_number, mt)
+            write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + output_formatter + '_{0}')
 
 
     #
