@@ -663,6 +663,7 @@ def create_argparser():
     parser.add_argument('mt', help="The reaction MT number to sample", type=int)
     parser.add_argument('num_samples', help="Number of samples to draw", type=int)
 
+    parser.add_argument('-mpiproc', type=int, help="Number of mpiprocs to use", default=1)
     parser.add_argument('-num_oversamples',
                         help="Make this many samples but only keep num_samples. Helps if negative samples are being drawn due to large uncertainties in small numbers",
                         type=int, default=-1, nargs=1)
@@ -694,11 +695,19 @@ if __name__ == "__main__":
             else:
                 make_plots = ''
 
-            qsub_helper.qsub_helper('sample_xsec.sh', ['python ' + os.path.abspath(__file__)], [
-                "{0} {1} {2} {5} -distribution {3} -num_oversamples {4} {6}".format(args.base_ace, args.cov_store,
-                                                                                    args.mt, args.distribution,
-                                                                                    args.num_oversamples,
-                                                                                    args.num_samples, make_plots)],
+            if args.mpiproc > 1:
+                mpi_cmd = 'mpiexec -n {0} '.format(args.mpiproc)
+            else:
+                mpi_cmd = ''
+
+            python_to_run = mpi_cmd + 'python ' + os.path.abspath(__file__)
+
+
+            qsub_helper.qsub_helper('sample_xsec.sh', [python_to_run], [
+                "{0} {1} {2} {5} -distribution {3} -num_oversamples {4} -mpiproc {7} {6}".format(args.base_ace, args.cov_store,
+                                                                                                 args.mt, args.distribution,
+                                                                                                 args.num_oversamples,
+                                                                                                 args.num_samples, make_plots, args.mpiproc)],
                                     pbs_args=pbs_args)
 
             if args.subpbs:
