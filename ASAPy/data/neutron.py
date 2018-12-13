@@ -568,7 +568,7 @@ class IncidentNeutron(EqualityMixin):
         return data
 
     @classmethod
-    def from_ace(cls, ace_or_filename, metastable_scheme='nndc'):
+    def from_ace(cls, ace_or_filename, metastable_scheme='mcnp'):
         """Generate incident neutron continuous-energy data from an ACE table
 
         Parameters
