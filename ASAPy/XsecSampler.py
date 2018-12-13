@@ -666,7 +666,7 @@ def create_argparser():
     parser.add_argument('-mpiproc', type=int, help="Number of mpiprocs to use", default=1)
     parser.add_argument('-num_oversamples',
                         help="Make this many samples but only keep num_samples. Helps if negative samples are being drawn due to large uncertainties in small numbers",
-                        type=int, default=-1, nargs=1)
+                        type=int, default=-1)
     parser.add_argument('--make_plots', action='store_true',
                         help="Option to create sampled cov plot, corr plot, xsec + uncertainties, and a few sampled xsec")
     parser.add_argument('--writepbs', action='store_true', help="Creates a pbs file to run this function")
@@ -704,10 +704,10 @@ if __name__ == "__main__":
 
 
             qsub_helper.qsub_helper('sample_xsec.sh', [python_to_run], [
-                "{0} {1} {2} {5} -distribution {3} -num_oversamples {4} -mpiproc {7} {6}".format(args.base_ace, args.cov_store,
+                "{0} {1} {2} {5} -distribution {3} -num_oversamples {4} {6}".format(args.base_ace, args.cov_store,
                                                                                                  args.mt, args.distribution,
                                                                                                  args.num_oversamples,
-                                                                                                 args.num_samples, make_plots, args.mpiproc)],
+                                                                                                 args.num_samples, make_plots)],
                                     pbs_args=pbs_args)
 
             if args.subpbs:
@@ -730,6 +730,8 @@ if __name__ == "__main__":
 
             if args.num_oversamples == -1:
                 num_samples_to_make = num_samples_to_take
+            else:
+                num_samples_to_make = args.num_oversamples
 
             if num_samples_to_make < num_samples_to_take:
                 raise Exception("Cannot make more samples {0} than taking {1}".format(num_samples_to_make, num_samples_to_take))
