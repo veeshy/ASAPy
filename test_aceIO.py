@@ -10,7 +10,7 @@ class TestAceEditor(TestCase):
 
     def test_get_nu_distro(self):
         [e, v] = self.ace.get_nu_distro()
-        self.assertAlmostEqual(e[4], 0.0001)
+        self.assertAlmostEqual(e[4], 100.0)
         self.assertAlmostEqual(v[4], 2.4338)
 
     def test_get_sigma(self):
@@ -37,8 +37,8 @@ class TestAceEditor(TestCase):
         #self.ace.apply_sum_rules()
 
     def test_get_nu(self):
-        ef = self.ace.get_chi_distro()
-        self.assertIsInstance(ef, pyne.ace.EnergyDistribution)
+        fission_chi_prompt_energy, fission_chi_prompt_energy_out, fission_chi_prompt_energy_p, fission_chi_prompt_energy_c = self.ace.get_chi_distro()
+        self.assertAlmostEqual(fission_chi_prompt_energy_p[4][25], 3.368962e-09)
 
     def test__check_if_mts_present(self):
         """

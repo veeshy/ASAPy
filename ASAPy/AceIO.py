@@ -72,39 +72,46 @@ class AceEditor:
 
     def get_chi_distro(self, mt=18):
         """
-        Gets the energy distribution pyne object from mt for further processing
+        Gets the energy distribution pyne object from mt for further processing.
+
+        Gets the prompt chi
+
         Returns
         -------
-        EnergyDistribution
-            A pyne object with methods:
-            cdf : ndarray
-                The CDF for the probability distribution of output energies
-            energy : ndarray
-                The energy range defined
-            energy_in : ndarray
-                The incident neutron energy
-            energy_out : ndarray
-                The out neutron energy
-            intt : array
-                ?
-            law : int
-                The ENDF LAW used to store the data (must be 4 here)
-            pdf : ndarray
-                The PDF for the probability distribution of output energies
-            pvalid : ndarray
-                ?
+        energy_in : ndarray
+            The incident neutron energy
+        energy_out : list of ndarray
+            The out neutron energy
+        pdf : list of ndarray
+            The PDF for the probability distribution of output energies
+        cdf : list of ndarray
+            The CDF for the probability distribution of output energies
         """
         fission_present = self._check_if_mts_present([mt])
+
         if fission_present:
-            fission_chi = self.table.reactions[mt].energy_dist
-            # only allow LAW=4
-            if fission_chi.law != 4:
-                raise ValueError("The fission MT={mt} chi is stored as non LAW=4 format. Only LAW 4 allowed, got: {law}".format(mt=mt, law=fission_chi.law))
+            fission_chi_prompt_product = self.table.reactions[mt].products[0]
+            fission_chi_prompt = fission_chi_prompt_product.distribution[0].energy
+
+            if 'prompt' not in fission_chi_prompt_product.__repr__():
+                raise Exception("Prompt fission chi not found on mt {0} of {1}".format(mt, self.ace_path))
+
+            fission_chi_prompt_energy = fission_chi_prompt.energy
+            fission_chi_prompt_energy_out = []
+            fission_chi_prompt_energy_p = []
+            fission_chi_prompt_energy_c = []
+            for distro in fission_chi_prompt.energy_out:
+                fission_chi_prompt_energy_out.append(distro.x)
+                fission_chi_prompt_energy_p.append(distro.p)
+                fission_chi_prompt_energy_c.append(distro.c)
+
+
+            # only allow LAW=4, not sure how to check this with openmc..
 
         else:
             raise IndexError("No fission MT={mt} present on ace file {ace}".format(mt=mt, ace=self.ace_path))
 
-        return fission_chi
+        return fission_chi_prompt_energy, fission_chi_prompt_energy_out, fission_chi_prompt_energy_p, fission_chi_prompt_energy_c
 
     def get_nu_distro(self):
         """
@@ -124,17 +131,19 @@ class AceEditor:
         """
 
         try:
-            self.table.nu_t_type
-        except AttributeError:
-            raise AttributeError("Nu is not present on this ACE file. " + self.ace_path)
+            fiss = self.table.reactions[18]
+        except:
+            raise KeyError("Fission MT=18 not present in this ACE " + self.ace_path)
 
-        if self.table.nu_t_type != 'tabular':
+        prod = fiss.derived_products[0]
+
+        label = prod.__repr__()
+        if 'tabulated' not in label:
             raise TypeError(
-                "Fission nu distribition is not stored in the tabular format (ASAPy does not support poly)")
+                "Fission nu distribition is not stored in the tabular format (ASAPy does not support poly) " + self.ace_path)
 
-        nu_t_e = self.table.nu_t_energy
-        nu_t_value = self.table.nu_t_value
-
+        nu_t_e = prod.yield_.x
+        nu_t_value = prod.yield_.y
 
         return nu_t_e, nu_t_value
 
