@@ -708,7 +708,7 @@ if __name__ == "__main__":
                                                                                                  args.mt, args.distribution,
                                                                                                  args.num_oversamples,
                                                                                                  args.num_samples, make_plots)],
-                                    pbs_args=pbs_args)
+                                    pbs_args=pbs_args, mpiprocs=args.mpiprocs)
 
             if args.subpbs:
                 os.system('qsub sample_xsec.sh')
