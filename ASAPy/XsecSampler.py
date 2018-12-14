@@ -122,7 +122,7 @@ class XsecSampler:
             # use a correlation of diag(1)
             samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
                                                              self.std_dev_df['s.d.(1)'].values, np.diag(np.ones(len(self.std_dev_df['x-sec(1)'].values))),
-                                                             num_samples, distro='lognorm')
+                                                             num_samples, distro='norm')
         elif sample_type.lower() == 'uniform':
             samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
                                                              self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
