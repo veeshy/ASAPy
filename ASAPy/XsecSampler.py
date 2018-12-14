@@ -675,7 +675,7 @@ def create_argparser():
     parser.add_argument('--waitforjob', help="Job number to wait for until this job runs")
     parser.add_argument('--subpbs', action='store_true', help="Runs the created pbs file")
     parser.add_argument('-distribution',
-                        help="Choose between norm and lognorm sampling", default='normal')
+                        help="Choose between norm. lognorm, uncorrelated, or uniform sampling", default='normal')
 
     return parser
 
@@ -724,6 +724,11 @@ if __name__ == "__main__":
     parser = create_argparser()
     args = parser.parse_args()
 
+    sample_choices = ['norm', 'lognorm', 'uncorrelated', 'uniform']
+    if args.distribution.lower() not in sample_choices:
+        raise Exception(
+            "Unknown sample distribution {0}, please choose from {1}".format(args.distribution, sample_choices))
+
     if args.writepbs:
         pbs_args = {}
         pbs_args['depends_on'] = args.waitforjob
@@ -753,11 +758,6 @@ if __name__ == "__main__":
 
     else:
         # do all this on all procs to avoid writing comm code..
-
-        sample_choices = ['norm', 'lognorm']
-        if args.distribution.lower() not in sample_choices:
-            raise Exception("Unknown sample distribution {0}, please choose from {1}".format(args.distribution, sample_choices))
-
         ace_file = args.base_ace
         ace_data = AceIO.AceEditor(ace_file)
         zaid = str(ace_data.table.atomic_number) + str(ace_data.table.mass_number)
