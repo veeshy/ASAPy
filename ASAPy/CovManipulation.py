@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import SALib.sample.latin as lhs
 from scipy.stats import multivariate_normal
@@ -297,8 +299,12 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, dist
             for j in range(len(log_corr)):
                 log_corr[i, j] = mean_values[i] * mean_values[j] / (std_dev[i] * std_dev[j]) * (np.exp(desired_corr[i, j] * np.sqrt(np.log(std_dev[i]**2 / mean_values[i]**2 + 1) * np.log(std_dev[j]**2 / mean_values[j]**2 + 1))) - 1)
 
-        diff = np.abs(log_corr - desired_corr) / np.abs(desired_corr)
-        diff[np.isnan(diff)] = 0
+        with np.warnings.catch_warnings():
+            # ignore divide by zero
+            np.warnings.simplefilter("ignore")
+            diff = np.abs(log_corr - desired_corr) / np.abs(desired_corr)
+            diff[np.isnan(diff)] = 0
+
         diff = diff.sum().sum() / len(log_corr)**2
         print("||(Log(corr) - original) / original||) =", diff)
         desired_corr = log_corr
@@ -348,14 +354,20 @@ def lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, dist
 
 
     dists = []
-    for var_num in range(num_vars):
-        dists.append([distro_to_sample_from.ppf(p, loc=mean_values[var_num], scale=std_dev[var_num]) for p in np_uniform(0.0, 1.0, num_samples)])
+    with warnings.catch_warnings():
+        # ignore sampling issues when log due to maybe sampling 0 log values which is supposed to be a constant number
+        if distro == 'lognorm':
+            warnings.simplefilter("ignore")
+
+        for var_num in range(num_vars):
+            dists.append([distro_to_sample_from.ppf(p, loc=mean_values[var_num], scale=std_dev[var_num]) for p in np_uniform(0.0, 1.0, num_samples)])
 
     dists = np.array(dists)
 
     # perform any post-processing
     if distro == 'lognorm':
         dists = np.exp(dists)
+        dists[np.isnan(dists)] = 1
 
     dists = order(R, dists.T)
 
