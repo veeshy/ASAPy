@@ -127,6 +127,12 @@ class XsecSampler:
             samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
                                                              self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
                                                              num_samples, distro='uniform')
+        elif sample_type.lower() == 'loguncorrelated':
+            samples = CovManipulation.lhs_normal_sample_corr(self.std_dev_df['x-sec(1)'].values,
+                                                             self.std_dev_df['s.d.(1)'].values,
+                                                             np.diag(np.ones(len(self.std_dev_df['x-sec(1)'].values))),
+                                                             num_samples, distro='lognorm')
+
         else:
             raise Exception('Sampling type: {0} not implimented'.format(sample_type))
 
@@ -680,7 +686,7 @@ def create_argparser():
     parser.add_argument('--waitforjob', help="Job number to wait for until this job runs")
     parser.add_argument('--subpbs', action='store_true', help="Runs the created pbs file")
     parser.add_argument('-distribution',
-                        help="Choose between norm. lognorm, uncorrelated, or uniform sampling", default='normal')
+                        help="Choose between norm. lognorm, uncorrelated, loguncorrelated, or uniform sampling", default='normal')
 
     return parser
 
@@ -689,48 +695,48 @@ if __name__ == "__main__":
     from coupleorigen import qsub_helper
     import argparse
 
-    # store_name = '../scale_cov_252.h5'
-    # store_name = '../u235_18_44_group.h5'
-    # # store_name = '../u238_102_3_group/u238_102_3g.h5'
-    # store_name = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/u235_102_44g_cov.h5'
-    #
-    # with pd.HDFStore(store_name, 'r') as h:
-    #     #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
-    #     ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
-    #     zaid = 92235
-    #     mt = 102  # 452
-    #     output_base = '../u235_correlated_102/'
-    #
-    #     if rank == 0:
-    #         # num_samples_to_take is the nsamples that are actually written
-    #         # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
-    #         num_samples_to_take = 500
-    #         num_samples_to_make = num_samples_to_take
-    #
-    #         sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='lognorm', raise_on_bad_sample=False,
-    #                                                 remove_neg=True)
-    #
-    #         sample_df = sample_df.iloc[:, 0:num_samples_to_take]
-    #         sample_df_full = sample_df_full.iloc[:, 0:num_samples_to_take]
-    #
-    #         # output_base = '../run_cover_chain_test_out/'
-    #         os.makedirs(output_base, exist_ok=True)
-    #
-    #         plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True,
-    #                           log_y_stddev=False)
-    #         #
-    #     else:
-    #         sample_df = None
-    #
-    #     sample_df = comm.bcast(sample_df, root=0)
-    #     # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
-    #
-    # exit(0)
+    store_name = '../scale_cov_252.h5'
+    store_name = '../u235_18_44_group.h5'
+    # store_name = '../u238_102_3_group/u238_102_3g.h5'
+    store_name = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/u235_102_44g_cov.h5'
+
+    with pd.HDFStore(store_name, 'r') as h:
+        #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
+        ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
+        zaid = 92235
+        mt = 102  # 452
+        output_base = '../test/'
+
+        if rank == 0:
+            # num_samples_to_take is the nsamples that are actually written
+            # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
+            num_samples_to_take = 500
+            num_samples_to_make = num_samples_to_take
+
+            sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='loguncorrelated', raise_on_bad_sample=False,
+                                                    remove_neg=True)
+
+            sample_df = sample_df.iloc[:, 0:num_samples_to_take]
+            sample_df_full = sample_df_full.iloc[:, 0:num_samples_to_take]
+
+            # output_base = '../run_cover_chain_test_out/'
+            os.makedirs(output_base, exist_ok=True)
+
+            plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True,
+                              log_y_stddev=False)
+            #
+        else:
+            sample_df = None
+
+        sample_df = comm.bcast(sample_df, root=0)
+        # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
+
+    exit(0)
 
     parser = create_argparser()
     args = parser.parse_args()
 
-    sample_choices = ['norm', 'lognorm', 'uncorrelated', 'uniform']
+    sample_choices = ['norm', 'lognorm', 'uncorrelated', 'uniform', 'loguncorrelated']
     if args.distribution.lower() not in sample_choices:
         raise Exception(
             "Unknown sample distribution {0}, please choose from {1}".format(args.distribution, sample_choices))
