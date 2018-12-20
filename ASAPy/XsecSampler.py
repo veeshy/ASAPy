@@ -481,6 +481,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     plt.savefig("{2}{3}{0}_{1}_few_sampled_xsec.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
 
     # Plot the corr matrix
+    # must flip the corr because it is in high energy to low energy form
     e_for_corr = list(xsec['e high'])
     e_for_corr.append(xsec['e low'].values[-1])
     e_for_corr = e_for_corr[-1::-1]
@@ -505,9 +506,12 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     ax[0].set(adjustable='box', aspect='equal')
 
     if corr_rel_diff:
-        im = ax[1].pcolormesh(X, Y, np.abs(np.corrcoef(sample_df_full_vals) - corr.values))
+        corr_for_plot = np.abs(np.corrcoef(sample_df_full_vals) - corr.values)
     else:
-        im = ax[1].pcolormesh(X, Y, np.corrcoef(sample_df_full_vals))
+        corr_for_plot = np.corrcoef(sample_df_full_vals)
+
+    corr_flipped_for_plot = np.flipud(np.fliplr(corr_for_plot))
+    im = ax[1].pcolormesh(X, Y, corr_flipped_for_plot)
     ax[1].set_xscale('log')
     ax[1].set_yscale('log')
 
@@ -688,6 +692,7 @@ if __name__ == "__main__":
     # store_name = '../scale_cov_252.h5'
     # store_name = '../u235_18_44_group.h5'
     # # store_name = '../u238_102_3_group/u238_102_3g.h5'
+    # store_name = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/u235_102_44g_cov.h5'
     #
     # with pd.HDFStore(store_name, 'r') as h:
     #     #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
@@ -699,10 +704,10 @@ if __name__ == "__main__":
     #     if rank == 0:
     #         # num_samples_to_take is the nsamples that are actually written
     #         # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
-    #         num_samples_to_take = 10
+    #         num_samples_to_take = 500
     #         num_samples_to_make = num_samples_to_take
     #
-    #         sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='norm', raise_on_bad_sample=False,
+    #         sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='lognorm', raise_on_bad_sample=False,
     #                                                 remove_neg=True)
     #
     #         sample_df = sample_df.iloc[:, 0:num_samples_to_take]
@@ -718,7 +723,7 @@ if __name__ == "__main__":
     #         sample_df = None
     #
     #     sample_df = comm.bcast(sample_df, root=0)
-    #     write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
+    #     # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
     #
     # exit(0)
 
