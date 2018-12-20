@@ -38,6 +38,7 @@ import tempfile
 from collections import OrderedDict
 
 from ASAPy import endf
+import numpy as np
 
 # For a given MAT number, give a name for the ACE table and a list of ZAID
 # identifiers
@@ -138,8 +139,7 @@ acer / %%%%%%%%%%%%%%%%%%%%%%%% Write out in ACE format %%%%%%%%%%%%%%%%%%%%%%%%
 /
 """
 
-# TODO create the group and corresponding ERROR inputs to make MF=31 and 35 files
-def _TEMPLATE_GROUPR_FOR_PLOT(num_temp):
+def _TEMPLATE_GROUPR_FOR_PLOT(num_temp, user_flux_weight=None):
     """
     Expands template to include variable # of temps for multi-temp chi/nu generation
     Parameters
@@ -156,11 +156,16 @@ def _TEMPLATE_GROUPR_FOR_PLOT(num_temp):
     s = """
 groupr
 {nendf} {ngroupr_in} 0 {ngroupr_out}/
-{mat} 3 0 {iwt_fluxweight} 1 {num_temp}/ 30 groups, weight flux
+{mat} 1 0 {iwt_fluxweight} 1 {num_temp}/ user groups, weight flux
 nu and chi / 
 {temps}/
-1e10/ background sigma (need to include "inf")"""
+1e10/ background sigma (need to include "inf")
+{cov_ngroups}/
+{cov_group_bounds}/"""
 
+    if user_flux_weight:
+        # no newline needed since the next part has a new line to start with
+        s += user_flux_weight + "/"
 
     for i in range(num_temp):
         s += """
@@ -174,29 +179,34 @@ nu and chi /
     s += "0/\n"
     return s
 
-def _TEMPLATE_GROUPR_FOR_XSEC(mts):
-    s = """
-groupr
+_TEMPLATE_GROUPR_FOR_XSEC = """
+groupr / %%%%%%%%%%%%%%%%%%%%%%%% Create shielded xsec %%%%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {ngroupr_in} 0 {ngroupr_out}/
-{mat} 1 0 {iwt_fluxweight} 1 {num_temp}/ 30 groups, weight flux
+{mat} 1 0 {iwt_fluxweight} 1 {num_temp}/ user groups, weight flux
 xsec / 
 {temps}/
 1e10/ background sigma (need to include "inf")/
 {cov_ngroups}/
-{cov_group_bounds/
+{cov_group_bounds}/
+3/
+0/
+0/
 """
 
-    num_mts = len(mts) if len(mts) >= 1 else 1
-    s = s.format(n_mats=num_mts)
-
-    if not mts:
-        raise Exception("Must provide mts to make group xsec for")
-
-    for mt in mts:
-        s += "{{mat}} {mt}\n".format(mt=mt)
-    s += "0/\n"
-
-    return s
+_TEMPLATE_GROUPR_FOR_XSEC_USER_FLUX = """
+groupr / %%%%%%%%%%%%%%%%%%%%%%%% Create shielded xsec %%%%%%%%%%%%%%%%%%%%%%%%%
+{nendf} {ngroupr_in} 0 {ngroupr_out}/
+{mat} 1 0 1 1 {num_temp}/ user groups, user weight flux
+xsec / 
+{temps}/
+1e10/ background sigma (need to include "inf")/
+{cov_ngroups}/
+{cov_group_bounds}/
+{user_flux_weight}/
+3/
+0/
+0/
+"""
 
 
 _THERMAL_TEMPLATE_THERMR = """
@@ -220,7 +230,7 @@ mfcov int
 # MF=33 is for neutron reaction data
 _TEMPLATE_ERRORR_33 = """
 errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-{nendf} {nerr_in} 0 {nerr}/
+{nendf} 0 {nerr_in} {nerr}/
 {mat} 1 {iwt_fluxweight}/
 0 {temperature}/
 0 33/
@@ -232,18 +242,23 @@ errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 _TEMPLATE_ERRORR_31 = """
 errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {nerr_in} {ngroupr_out} {nerr}/
-{mat} 3 {iwt_fluxweight} 1 1/ 30 group, weight function
+{mat} 1 {iwt_fluxweight}/ group struct, weight function
 1 {temperature}/
 0 31 1 1 -1/
+{cov_ngroups}/
+{cov_group_bounds}/
 """
 
+# TODO need to figure out how to get chi values out (rather than w/e is coming out right now..)
 # MF=35 is for fission chi
 _TEMPLATE_ERRORR_35 = """
 errorr / %%%%%%%%%%%%%%%%%%%%%%%%% Calc COV %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {nerr_in} {ngroupr_out} {nerr}/
-{mat} 3 {iwt_fluxweight} 1 1/ 30 group weight function
+{mat} 1 {iwt_fluxweight}/ group struct, weight function
 1 {temperature}/
 0 35 1 1 -1/
+{cov_ngroups}/
+{cov_group_bounds}/
 """
 
 
@@ -399,7 +414,7 @@ def make_pendf(filename, pendf='pendf', error=0.001, stdout=False):
 def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=None,
                   error=0.001, broadr=True, heatr=True, purr=True, acer=True, errorr=True,
                   cov_energy_groups=None, run=False, covr_plot_mts=None, chi=False, nu=False,
-                  iwt_fluxweight=9, **kwargs):
+                  iwt_fluxweight=9, user_flux_weight_vals=None, **kwargs):
     """Generate incident neutron ACE file from an ENDF file
 
     Parameters
@@ -432,7 +447,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
     run : bool, optional
         Run njoy
     covr_plot_mts : list
-        List of mts to plot using plotr
+        List of mts to plot using plotr, also the MTs to make cov for..
     chi : bool
         Calculate chi cov via groupr
     nu : bool
@@ -489,18 +504,45 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
 
     if errorr:
         if cov_energy_groups is None:
-            cov_energy_groups = energy_groups_238
+            raise Exception("Please provide a cov_energy_groups input.")
 
         cov_ngroups = len(cov_energy_groups) - 1
 
+        if iwt_fluxweight == 1:
+            # 0 flux is allowed
+            if user_flux_weight_vals is None:
+                raise Exception("Must provide user_flux_weight_vals flat list of (e, v) pairs")
+
+            user_flux_weight_vals = np.array(user_flux_weight_vals)
+            # _user_flux_weight = """0. 0. 0  0  1  NP  NP  INT"""
+            user_flux_weight = "0. 0. 0  0  1  {NP}  {NP}  {INT}\n".format(NP=int(len(user_flux_weight_vals) / 2),
+                                                                           INT=2)  # 2= linlin interpolation scheme
+            user_flux_weight_vals_str = [str(e) for e in user_flux_weight_vals]
+            # inefficient way to ensure we don't go past 80 chars for fortran limitations
+            user_flux_weight_vals_str = ' \n'.join(user_flux_weight_vals_str)
+            user_flux_weight += user_flux_weight_vals_str
+
         fname = "{}_{}"
         for i, temperature in enumerate(temperatures):
-            nerr_in = nbroadr  # PENDF tape that was broadened to right temp
+            ngroupr_in = nbroadr
+            ngroupr_out = nlast + 1
+            nlast += 1
+
+            nerr_in = ngroupr_out  # PENDF tape that was broadened to right temp
             nerr = nlast + 1
             cov_group_bounds = [str(e) for e in cov_energy_groups]
             # inefficient way to ensure we don't go past 80 chars for fortran limitations
             cov_group_bounds = ' \n'.join(cov_group_bounds)
+
+            if iwt_fluxweight == 1:
+                commands += _TEMPLATE_GROUPR_FOR_XSEC_USER_FLUX.format(**locals())
+            else:
+                commands += _TEMPLATE_GROUPR_FOR_XSEC.format(**locals())
+
             commands += _TEMPLATE_ERRORR_33.format(**locals())
+            if iwt_fluxweight == 1:
+                commands += user_flux_weight + "/\n"
+
             nlast += 1
 
             covr_out = nlast + 1
@@ -520,7 +562,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
                 commands += _TEMPLATE_VIEWR.format(**locals())
 
         if nu:
-            commands += "-- Nu-bar info\n"
+            commands += "\n-- Nu-bar info\n"
             ngroupr_in = nbroadr  # PENDF tape
             ngroupr_out = nlast + 1
             s = _TEMPLATE_GROUPR_FOR_PLOT(num_temp)
@@ -531,6 +573,8 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             nerr_in = nbroadr  # PENDF tape
             nerr = nlast + 1
             commands += _TEMPLATE_ERRORR_31.format(**locals())
+            if iwt_fluxweight == 1:
+                commands += user_flux_weight + "/\n"
             nlast += 1
 
 
@@ -538,7 +582,6 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             nlast += 1
 
             viewr_plot_out = nlast + 1
-            tapeout[viewr_plot_out] = fname.format("viewr_nu_", temperature) + ".eps"
             nlast += 1
 
             commands += _TEMPLATE_COVR_FOR_PLOT([452]).format(**locals())
@@ -546,6 +589,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
 
             covr_out = nlast + 1
             tapeout[covr_out] = fname.format("covr_nu", temperature) + ".txt"
+            tapeout[viewr_plot_out] = fname.format("viewr_nu", temperature) + ".eps"
             nlast += 1
             commands += _TEMPLATE_COVR_FOR_LIB.format(**locals())
 
@@ -554,6 +598,8 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             nerr_in = nbroadr  # PENDF tape
             nerr = nlast + 1
             commands += _TEMPLATE_ERRORR_35.format(**locals())
+            if iwt_fluxweight == 1:
+                commands += user_flux_weight + "/\n"
             nlast += 1
 
 
@@ -561,7 +607,6 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             nlast += 1
 
             viewr_plot_out = nlast + 1
-            tapeout[viewr_plot_out] = fname.format("viewr_chi_", temperature) + ".eps"
             nlast += 1
 
             commands += _TEMPLATE_COVR_FOR_PLOT([]).format(**locals())
@@ -569,6 +614,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
 
             covr_out = nlast + 1
             tapeout[covr_out] = fname.format("covr_chi", temperature) + ".txt"
+            tapeout[viewr_plot_out] = fname.format("viewr_chi", temperature) + ".eps"
             nlast += 1
             commands += _TEMPLATE_COVR_FOR_LIB.format(**locals())
 

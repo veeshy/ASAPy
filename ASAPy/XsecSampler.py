@@ -488,7 +488,8 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
 
     fig, ax = plt.subplots(ncols=2, figsize=(8, 6), sharey=True)
 
-    im = ax[0].pcolormesh(X, Y, corr.values)
+    corr_flipped_for_plot = np.flipud(np.fliplr(corr.values))
+    im = ax[0].pcolormesh(X, Y, corr_flipped_for_plot)
     ax[0].set_xscale('log')
     ax[0].set_yscale('log')
 
