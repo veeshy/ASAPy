@@ -1,5 +1,5 @@
 import re
-from ASAPy.data import neutron
+from .data import neutron
 import numpy as np
 import os
 import copy
