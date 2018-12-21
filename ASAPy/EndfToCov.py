@@ -54,7 +54,8 @@ def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, 
     """
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = output_base_path
+        # uncomment to run in output path
+        # tmpdir = output_base_path
         # Copy evaluations to appropriates 'tapes'
         for tape_num, filename in tapein.items():
             tmpfilename = os.path.join(tmpdir, 'tape{}'.format(tape_num))
@@ -428,12 +429,13 @@ if __name__ == "__main__":
                              1.384e+07, 1.369027e-07, 1.455e+07, 4.962589e-08, 1.5683e+07, 3.75955e-08, 1.7333e+07,
                              2.094257e-08, 2e+07, 8.083706e-09]
 
-    nu = True
-    chi = True
+    nu = False
+    chi = False
+
     for cov_energy_group in cov_groups:
-        # run_cover_chain("/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf", [mt], [300],
-        #                 output_dir=output_dir, cov_energy_groups=cov_energy_group, iwt_fluxweight=6,
-        #                 user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi)
+        run_cover_chain("/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf", [mt], [300],
+                        output_dir=output_dir, cov_energy_groups=cov_energy_group, iwt_fluxweight=9,
+                        user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi)
 
         process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
                           output_h5_format='u235_102_{0}g_cov.h5')
