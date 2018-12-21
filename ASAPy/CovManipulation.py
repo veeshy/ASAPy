@@ -268,7 +268,7 @@ def normal_sample_corr(mean_values, desired_cov, num_samples, allow_singular=Fal
     m = multivariate_normal(mean=mean_values, cov=desired_cov, allow_singular=allow_singular)
     return m.rvs(num_samples)
 
-def __sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
+def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
     """
     Randomally samples from a normal-multivariate distribution using LHS while attempting to get the desired_cov
 
@@ -376,7 +376,7 @@ def __sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='
     return dists
 
 
-def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
+def __sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
     """
     Randomally samples from a normal-multivariate distribution using LHS while attempting to get the desired_cov
 
@@ -392,7 +392,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
 
     """
 
-    raise Exception("This method is deprecated please use sample_with_corr")
+    # raise Exception("This method is deprecated please use sample_with_corr")
 
     # draw samples in an uncorrelated manner
     num_vars = len(mean_values)
