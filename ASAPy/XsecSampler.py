@@ -467,9 +467,13 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     # plot the base x-sec too
     ax.plot(e, st, linestyle='-.', color='k')
 
+    integral_xsec = np.trapz(st, e)
+
     for i in range(num_xsec):
-        ax.plot(e, map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i],
-                                                  min_e=xsec['e low'].min()) * st, label=i)
+        sampled_xsec = map_groups_to_continuous(e, xsec['e high'], sample_df.iloc[:, i], min_e=xsec['e low'].min()) * st
+        sampled_xsec *= integral_xsec / np.trapz(sampled_xsec, e)
+
+        ax.plot(e, sampled_xsec, label=i)
 
     # plot the base again so it appears on top
     ax.plot(e, st, linestyle='-.', color='k')
@@ -649,8 +653,12 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
         e = ae.get_energy(mt)
         original_sigma = ae.get_sigma(mt)
 
-        ae.set_sigma(mt, map_groups_to_continuous(e, xsec['e high'], col,
-                                                   min_e=xsec['e low'].min()) * original_sigma)
+        original_sigma_integral = np.trapz(original_sigma, e)
+
+        sampled_xsec = map_groups_to_continuous(e, xsec['e high'], col, min_e=xsec['e low'].min()) * original_sigma
+        sampled_xsec *= original_sigma_integral / np.trapz(sampled_xsec, e)
+
+        ae.set_sigma(mt, sampled_xsec)
         ae.apply_sum_rules()
 
         w = AceIO.WriteAce(ace_file)
