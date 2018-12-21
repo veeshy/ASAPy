@@ -6,7 +6,6 @@ from numbers import Real, Integral
 
 import numpy as np
 
-import data
 from . import checkvalue as cv
 from .mixin import EqualityMixin
 from .data import EV_PER_MEV

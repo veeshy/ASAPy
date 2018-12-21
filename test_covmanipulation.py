@@ -21,7 +21,7 @@ class Test_update_mcnp_input(unittest.TestCase):
         -------
 
         """
-        dependent_samples = cm.lhs_normal_sample_corr(self.means, self.std_dev, self.desired_corr, self.samples)
+        dependent_samples = cm.sample_with_corr(self.means, self.std_dev, self.desired_corr, self.samples)
         corr = np.corrcoef(dependent_samples.T)
 
         # divide by zero likely, it's okay though will be removed and max taken
@@ -40,7 +40,7 @@ class Test_update_mcnp_input(unittest.TestCase):
         -------
 
         """
-        dependent_samples = cm.lhs_normal_sample_corr(self.means, self.std_dev, self.desired_corr, self.samples, distro='lognorm')
+        dependent_samples = cm.sample_with_corr(self.means, self.std_dev, self.desired_corr, self.samples, distro='lognorm')
         corr = np.corrcoef(dependent_samples.T)
 
         # divide by zero likely, it's okay though will be removed and max taken
