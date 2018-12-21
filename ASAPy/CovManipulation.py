@@ -268,7 +268,7 @@ def normal_sample_corr(mean_values, desired_cov, num_samples, allow_singular=Fal
     m = multivariate_normal(mean=mean_values, cov=desired_cov, allow_singular=allow_singular)
     return m.rvs(num_samples)
 
-def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
+def __sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
     """
     Randomally samples from a normal-multivariate distribution using LHS while attempting to get the desired_cov
 
@@ -360,7 +360,9 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
             warnings.simplefilter("ignore")
 
         for var_num in range(num_vars):
-            dists.append([distro_to_sample_from.ppf(p, loc=mean_values[var_num], scale=std_dev[var_num]) for p in np_uniform(0.0, 1.0, num_samples)])
+            # dists.append([distro_to_sample_from.ppf(p, loc=mean_values[var_num], scale=std_dev[var_num]) for p in np_uniform(0.0, 1.0, num_samples)])
+            dists.append([distro_to_sample_from.ppf(p, loc=mean_values[var_num], scale=std_dev[var_num]) for p in
+                          lhs_uniform_sample(1, num_samples).T[0]])
 
     dists = np.array(dists)
 
@@ -374,7 +376,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
     return dists
 
 
-def __lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
+def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
     """
     Randomally samples from a normal-multivariate distribution using LHS while attempting to get the desired_cov
 
@@ -390,7 +392,7 @@ def __lhs_normal_sample_corr(mean_values, std_dev, desired_corr, num_samples, di
 
     """
 
-    raise Exception("This method is deprecated please use lhs_normal_sample_corr")
+    raise Exception("This method is deprecated please use sample_with_corr")
 
     # draw samples in an uncorrelated manner
     num_vars = len(mean_values)
