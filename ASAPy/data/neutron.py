@@ -665,7 +665,13 @@ class IncidentNeutron(EqualityMixin):
                 # Determine redundant cross section
                 rx = data._get_redundant_reaction(mt, mts)
                 rx.products += _get_photon_products_ace(ace, rx)
-                data.reactions[mt] = rx
+                if mt == 3:
+                    # ASAPy: instead of summing all the bits, just use the known ACE file absorption xsec
+                    # which is mt=3 from the ace file. This is used because the sum causes round-off error making
+                    # the lazy ASAPy ace replace not work on mt=3
+                    data.reactions[101] = absorption
+                else:
+                    data.reactions[mt] = rx
 
         # For transmutation reactions, sometimes only individual levels are
         # present in an ACE file, e.g. MT=600-649 instead of the summation

@@ -222,34 +222,33 @@ class AceEditor:
         """
 
         # the sum rules
-        # potential for round-off error but each mt is summed indvidually so order does not matter.
+        # potential for round-off error but each mt is summed individually so order does not matter.
         # if a sum mt does not exist, nothing happens
-
-        # considered redundant, may not need to adjust this if your program does not use it
-        # 4, 27, 101, 3, 4, 1
-
-        mt_4 = list(range(50, 92))
-        mt_16 = list(range(875, 892))
-        mt_18 = [19, 20, 21, 38]
 
         mt_103 = list(range(600, 650))
         mt_104 = list(range(650, 700))
         mt_105 = list(range(700, 750))
         mt_106 = list(range(750, 800))
         mt_107 = list(range(800, 850))
-        mt_101 = [102, *mt_103, *mt_104, *mt_105, *mt_106, *mt_107, *list(range(108, 118)), 155, 182, 191, 192, 193,
-                  197]  # contains 103, 104, 105, 106, 107
+        mt_101 = [102, *mt_103, *mt_104, *mt_105, *mt_106, *mt_107, 108, 109, 111, 112, 113, 114, 115, 116, 117, 155,
+                  182, 191, 192, 193, 197]
+        mt_18 = [19, 20, 21, 38]
         mt_27 = [*mt_18, *mt_101]  # has 18 and 101 which are sums themselves
 
-        mt_3 = [*mt_4, 5, 11, *mt_16, 17, *mt_18, *list(range(22, 27)), *list(range(28, 38)), 41, 42, 44, 45, *mt_101,
-                152, 153, 154, *list(range(156, 182)),
-                *list(range(183, 191)), 194, 195, 196, 198, 199, 200]  # contains 4 which is a sum
+        mt_16 = list(range(875, 892))
+        mt_4 = list(range(50, 92))
+        # mt_3 = [*mt_4, 5, 11, *mt_16, 17, *list(range(22, 26)), *mt_27, 28, 29, 30, 32, 33, 34, 35, 36, 37, 41, 42, 44,
+        #         45, 152, 153, 154, *list(range(156, 182)), *list(range(183, 191)), 194, 195, 196, 198, 199, 200]
+
+        # according to https://t2.lanl.gov/nis/endf/mts.html
+        mt_3 = [4, 5, 11, 16, 17, 18, *list(range(22, 27)), *list(range(28, 38)), 41, 42, *list(range(44, 46)),
+                *list(range(102, 118))]
 
         mt_1 = [2, *mt_3]  # contains 3 which is a sum
 
-        # go from highest to lowest since lower ENDF #'s are not in higher #'s
-        sum_mts_list = [mt_107, mt_106, mt_105, mt_104, mt_103, mt_101, mt_27, mt_18, mt_16, mt_4, mt_3, mt_1]
-        sum_mts = [107, 106, 105, 104, 103, 101, 27, 18, 16, 4, 3, 1]
+        # go from highest to lowest since lower ENDF #'s are not in higher #'s, except 18 which is in 27 so do 18 first
+        sum_mts_list = [mt_107, mt_106, mt_105, mt_104, mt_103, mt_101, mt_18, mt_27, mt_16, mt_4, mt_3, mt_1]
+        sum_mts = [107, 106, 105, 104, 103, 101, 18, 27, 16, 4, 3, 1]
 
         for sum_mt, mts_in_sum in zip(sum_mts, sum_mts_list):
             # ensure the sum'd mt is present before trying to set it
@@ -371,7 +370,8 @@ class WriteAce:
         last_idx_of_data = first_idx_of_data + len(original_str_line)
 
         replace_with_line = self.format_mcnp(replace_with)
-        self.single_line = self.single_line.replace(self.single_line[first_idx_of_data: last_idx_of_data], replace_with_line)
+        self.single_line = self.single_line.replace(self.single_line[first_idx_of_data: last_idx_of_data],
+                                                    replace_with_line, 1)
 
     def write_ace(self, ace_path_to_write):
 

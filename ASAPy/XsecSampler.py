@@ -656,7 +656,10 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
 
         w = AceIO.WriteAce(ace_file)
         base_ace = AceIO.AceEditor(ace_file)
-        for mt_adjusted in ae.adjusted_mts:
+        # loop low MT to high because that's how the ace file is written. This helps avoid cases where a redundant MT
+        # might replaces multiple MTs at once which may or may not be what we wanted
+
+        for mt_adjusted in sorted(list(ae.adjusted_mts)):
             try:
                 w.replace_array(base_ace.get_sigma(mt_adjusted), ae.get_sigma(mt_adjusted))
             except ValueError:
