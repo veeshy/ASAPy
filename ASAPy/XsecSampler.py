@@ -655,13 +655,18 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
         ae.apply_sum_rules()
 
         w = AceIO.WriteAce(ace_file)
-        w.replace_array(original_sigma, ae.get_sigma(mt))
+        base_ace = AceIO.AceEditor(ace_file)
+        for mt_adjusted in ae.adjusted_mts:
+            try:
+                w.replace_array(base_ace.get_sigma(mt_adjusted), ae.get_sigma(mt_adjusted))
+            except ValueError:
+                print("MT {0} adjusted but was not present on original ace, perhaps it was redundant".format(mt_adjusted))
+
         w.write_ace(output_formatter.format(idx))
 
         del ae
 
     if rank == 0:
-        print(1)
         # add in e groups then print all relative data and the base xsec
         sample_df_rel.insert(0, 'e low', xsec['e low'])
         sample_df_rel.insert(1, 'e high', xsec['e high'])
@@ -711,7 +716,7 @@ if __name__ == "__main__":
     #     if rank == 0:
     #         # num_samples_to_take is the nsamples that are actually written
     #         # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
-    #         num_samples_to_take = 500
+    #         num_samples_to_take = 5
     #         num_samples_to_make = num_samples_to_take
     #
     #         sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='uncorrelated', raise_on_bad_sample=False,
@@ -730,7 +735,7 @@ if __name__ == "__main__":
     #         sample_df = None
     #
     #     sample_df = comm.bcast(sample_df, root=0)
-    #     # write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
+    #     write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
     #
     # exit(0)
 

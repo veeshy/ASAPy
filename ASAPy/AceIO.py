@@ -228,7 +228,6 @@ class AceEditor:
         # considered redundant, may not need to adjust this if your program does not use it
         # 4, 27, 101, 3, 4, 1
 
-        # mt_4 particularly does not define xsec on the union energy grid so summing it is non-trivial
         mt_4 = list(range(50, 92))
         mt_16 = list(range(875, 892))
         mt_18 = [19, 20, 21, 38]
@@ -272,7 +271,7 @@ class AceEditor:
                                                  "considered redundant, perhaps you don't need to apply the sum rule.\n\n"
                                                  "MTs in this sum that are in this ACE file:\n{1}".format(sum_mt, sum_mts_present))
                             self.set_sigma(sum_mt, new_sum)
-                            # print("Adjusting MT={0} due to ENDF sum rules".format(sum_mt))
+                            self.adjusted_mts.add(sum_mt)
 
 
     def _check_if_mts_present(self, mt_list, compare_to=None):
