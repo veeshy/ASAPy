@@ -17,7 +17,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 class XsecSampler:
-    def __init__(self, h, zaid_1, mt_1, zaid_2=None, mt_2=None):
+    def __init__(self, h, zaid_1, mt_1, zaid_2=None, mt_2=None, remove_negative_eig=False):
         """
         Sampling methods for cross-sections
         Parameters
@@ -27,13 +27,16 @@ class XsecSampler:
         mt_1 : int or str
         zaid_2 : None or int or str
         mt_2 : None or int or str
+        remove_negative_eig : bool
+            Replaces any negative eigenvalues in correlation matrix with a small positive number, used to help decomposition during sampling
         """
 
         # load the cov and std_dev from the store
         self.std_dev_df, self.corr_df = self.load_zaid_mt(h, zaid_1, mt_1, zaid_2, mt_2)
 
         # correct the correlation for neg eigenvalues if needed
-        self.corr_df.loc[:, :] = self._fix_non_pos_semi_def_matrix_eigen(self.corr_df.values)
+        if remove_negative_eig:
+            self.corr_df.loc[:, :] = self._fix_non_pos_semi_def_matrix_eigen(self.corr_df.values)
 
     @staticmethod
     def load_zaid_mt(h, zaid_1, mt_1, zaid_2=None, mt_2=None):
