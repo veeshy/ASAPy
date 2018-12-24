@@ -628,7 +628,7 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, 
     plt.savefig("{2}{3}{0}_{1}_base_xsec_with_std.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
 
 
-def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='xsec_sampled_{0}', zaid_2=None, mt_2=None):
+def write_sampled_data(h, ace_file, zaid, mts, sample_dfs_rel, output_formatter='xsec_sampled_{0}', zaid_2=None, mt_2=None):
     """
     Write sampled data to files + the group-wise sampled data to a csv
 
@@ -639,23 +639,28 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
     :return:
     """
 
-    # # load the cov to get the mapping
-    xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
-
     # sample_df contains relative values (sampled / mean) which are then multiplied by the actual continuous xsec and written to an ace file
 
-    for idx, col in sample_df_rel.iteritems():
-        if idx % size != rank: continue
+    # iter over # of samples, each processor does 1 whole ace file no matter how many mts were sampled
+    for sample_number, _ in sample_dfs_rel[0].iteritems():
+        if sample_number % size != rank: continue
 
-        # set the sigma in place
+        # load the base ace file to get a fresh copy
         ae = AceIO.AceEditor(ace_file)
-        e = ae.get_energy(mt)
-        original_sigma = ae.get_sigma(mt)
 
-        sampled_xsec = map_groups_to_continuous(e, xsec['e high'], col, min_e=xsec['e low'].min()) * original_sigma
+        # iter over mts, with the idea that the mts were given in the same order as the sample_dfs
+        for mt_idx, mt in enumerate(mts):
+            col = sample_dfs_rel[mt_idx][sample_number]
+            # load the cov to get the mapping
+            xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
 
-        ae.set_sigma(mt, sampled_xsec)
-        ae.apply_sum_rules()
+            e = ae.get_energy(mt)
+            original_sigma = ae.get_sigma(mt)
+
+            sampled_xsec = map_groups_to_continuous(e, xsec['e high'], col, min_e=xsec['e low'].min()) * original_sigma
+
+            ae.set_sigma(mt, sampled_xsec)
+            ae.apply_sum_rules()
 
         w = AceIO.WriteAce(ace_file)
         base_ace = AceIO.AceEditor(ace_file)
@@ -672,25 +677,27 @@ def write_sampled_data(h, ace_file, zaid, mt, sample_df_rel, output_formatter='x
             except ValueError:
                 print("MT {0} adjusted but was not present on original ace, perhaps it was redundant".format(mt_adjusted))
 
-        w.write_ace(output_formatter.format(idx))
+        w.write_ace(output_formatter.format(sample_number))
 
         del ae
 
     if rank == 0:
         # add in e groups then print all relative data and the base xsec
-        sample_df_rel.insert(0, 'e low', xsec['e low'])
-        sample_df_rel.insert(1, 'e high', xsec['e high'])
-        sample_df_rel.insert(2, 'xsec', xsec['x-sec(1)'])
-        sample_df_rel.insert(3, 'rel std', xsec['rel.s.d.(1)'])
-        sample_df_rel.to_csv('{0}_samples.csv'.format(output_formatter.format('data')))
+        for mt, sample_df_rel in zip(mts, sample_dfs_rel):
+            xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
+            sample_df_rel.insert(0, 'e low', xsec['e low'])
+            sample_df_rel.insert(1, 'e high', xsec['e high'])
+            sample_df_rel.insert(2, 'xsec', xsec['x-sec(1)'])
+            sample_df_rel.insert(3, 'rel std', xsec['rel.s.d.(1)'])
+            sample_df_rel.to_csv('{0}_samples.csv'.format(output_formatter.format(mt)))
 
 def create_argparser():
     parser = argparse.ArgumentParser(
         description="Generate random samples of ACE data for use in SA/UQ")
     parser.add_argument('base_ace', help="The base ACE file to sample from")
     parser.add_argument('cov_store', help="The ASAPy covariance store to use")
-    parser.add_argument('mt', help="The reaction MT number to sample", type=int)
     parser.add_argument('num_samples', help="Number of samples to draw", type=int)
+    parser.add_argument('mts', help="The reaction MT number to sample", type=int, nargs='+')
 
     parser.add_argument('-mpiproc', type=int, help="Number of mpiprocs to use", default=1)
     parser.add_argument('-num_oversamples',
@@ -714,40 +721,44 @@ if __name__ == "__main__":
     # store_name = '../scale_cov_252.h5'
     # store_name = '../u235_18_44_group.h5'
     # store_name = '../u238_102_3_group/u238_102_3g.h5'
-    store_name = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/u235_102_44g_cov.h5'
-
-    with pd.HDFStore(store_name, 'r') as h:
-        #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
-        ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
-        zaid = 92235
-        mt = 452
-        output_base = '../test/'
-
-        if rank == 0:
-            # num_samples_to_take is the nsamples that are actually written
-            # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
-            num_samples_to_take = 5
-            num_samples_to_make = num_samples_to_take
-
-            sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='uncorrelated', raise_on_bad_sample=False,
-                                                    remove_neg=True)
-
-            sample_df = sample_df.iloc[:, 0:num_samples_to_take]
-            sample_df_full = sample_df_full.iloc[:, 0:num_samples_to_take]
-
-            # output_base = '../run_cover_chain_test_out/'
-            os.makedirs(output_base, exist_ok=True)
-
-            plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True,
-                              log_y_stddev=False)
-            #
-        else:
-            sample_df = None
-
-        sample_df = comm.bcast(sample_df, root=0)
-        write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + '/u28_{0}')
-
-    exit(0)
+    # store_name = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/u235_102_44g_cov.h5'
+    #
+    # with pd.HDFStore(store_name, 'r') as h:
+    #     #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
+    #     ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
+    #     zaid = 92235
+    #     mts = [102, 452]
+    #     output_base = '../test/'
+    #
+    #     if rank == 0:
+    #         # num_samples_to_take is the nsamples that are actually written
+    #         # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
+    #         num_samples_to_take = 5
+    #         num_samples_to_make = num_samples_to_take
+    #
+    #         os.makedirs(output_base, exist_ok=True)
+    #         sample_dfs = []
+    #         sample_dfs_full = []
+    #         for mt in mts:
+    #             sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='uncorrelated', raise_on_bad_sample=False,
+    #                                                     remove_neg=True)
+    #
+    #             sample_df = sample_df.iloc[:, 0:num_samples_to_take]
+    #             sample_df_full = sample_df_full.iloc[:, 0:num_samples_to_take]
+    #
+    #             sample_dfs.append(sample_df)
+    #             sample_dfs_full.append(sample_df_full)
+    #
+    #             plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True,
+    #                               log_y_stddev=False)
+    #         #
+    #     else:
+    #         sample_dfs = None
+    #
+    #     sample_dfs = comm.bcast(sample_dfs, root=0)
+    #     write_sampled_data(h, ace_file, zaid, mts, sample_dfs, output_formatter=output_base + '/u28_{0}')
+    #
+    # exit(0)
 
     parser = create_argparser()
     args = parser.parse_args()
@@ -771,12 +782,15 @@ if __name__ == "__main__":
         else:
             mpi_cmd = ''
 
+        mts = [str(i) for i in args.mts]
+        mts = ' '.join(mts)
+
         python_to_run = mpi_cmd + 'python ' + os.path.abspath(__file__)
 
 
         qsub_helper.qsub_helper('sample_xsec.sh', [python_to_run], [
-            "{0} {1} {2} {5} -distribution {3} -num_oversamples {4} {6}".format(args.base_ace, args.cov_store,
-                                                                                             args.mt, args.distribution,
+            "{0} {1} {5} {2} -distribution {3} -num_oversamples {4} {6}".format(args.base_ace, args.cov_store,
+                                                                                             mts, args.distribution,
                                                                                              args.num_oversamples,
                                                                                              args.num_samples, make_plots)],
                                 pbs_args=pbs_args, mpiprocs=args.mpiproc)
@@ -789,7 +803,6 @@ if __name__ == "__main__":
         ace_file = args.base_ace
         ace_data = AceIO.AceEditor(ace_file)
         zaid = str(ace_data.table.atomic_number) + str(ace_data.table.mass_number)
-        mt = args.mt
         atomic_symbol = ace_data.table.atomic_symbol
 
         store_name = args.cov_store
@@ -804,23 +817,27 @@ if __name__ == "__main__":
             raise Exception("Cannot make more samples {0} than taking {1}".format(num_samples_to_make, num_samples_to_take))
 
         output_base = './'
+        # if we ever take a user output_base, we might want to make the folder to
+        # os.makedirs(output_base, exist_ok=True)
+        sample_dfs = []
+        sample_dfs_full = []
 
         with pd.HDFStore(os.path.expanduser(store_name), 'r') as h:
             if rank == 0:
-                sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_take,
-                                                        num_samples_to_make=num_samples_to_make,
-                                                        sample_type=args.distribution, raise_on_bad_sample=False,
-                                                        remove_neg=True)
+                for mt in args.mts:
+                    sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_take,
+                                                            num_samples_to_make=num_samples_to_make,
+                                                            sample_type=args.distribution, raise_on_bad_sample=False,
+                                                            remove_neg=True)
 
-                if args.make_plots:
-                    # if we take user folder then we can make it like this..
-                    # os.makedirs(output_base, exist_ok=True)
+                    if args.make_plots:
+                        plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base,
+                                          log_y=True, log_y_stddev=False)
 
-                    plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base,
-                                      log_y=True, log_y_stddev=False)
+                    sample_dfs.append(sample_df)
             else:
-                sample_df = None
+                sample_dfs = None
 
-            sample_df = comm.bcast(sample_df, root=0)
-            output_formatter = '{0}{1}_{2}'.format(atomic_symbol, ace_data.table.mass_number, mt)
-            write_sampled_data(h, ace_file, zaid, mt, sample_df, output_formatter=output_base + output_formatter + '_{0}')
+            sample_dfs = comm.bcast(sample_dfs, root=0)
+            output_formatter = '{0}{1}'.format(atomic_symbol, ace_data.table.mass_number)  # mt is written by the output
+            write_sampled_data(h, ace_file, zaid, args.mts, sample_dfs, output_formatter=output_base + output_formatter + '_{0}')
