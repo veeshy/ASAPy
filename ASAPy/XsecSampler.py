@@ -4,6 +4,7 @@ import pandas as pd
 import scipy.linalg as LA
 from matplotlib import gridspec
 from matplotlib.ticker import FormatStrFormatter
+import warnings
 
 from ASAPy import CovManipulation
 from ASAPy import AceIO
@@ -58,15 +59,17 @@ class XsecSampler:
         # load the cov and std_dev from the store
         std_dev_df = h['{0}/{1}/{2}/{3}/std_dev'.format(zaid_1, mt_1, zaid_2, mt_2)]
         corr_df = h['{0}/{1}/{2}/{3}/corr'.format(zaid_1, mt_1, zaid_2, mt_2)]
-        # ensure diagonals and matrix normalized to 1.0
+        # ensure diagonals and matrix normalized to 1.0 + have 1.0 on the diag
+        np.fill_diagonal(corr_df.values, 1000)  # boxer format used 1000 as 1.0 for correlations
         corr_df = corr_df / corr_df.loc[1, 1]
+
 
         # make sure e low and e high are in the correct order
         # todo: fix: this is a dumb workaround for my parsed scale cov which flipped e high and e low keys
         if std_dev_df['e low'][1] > std_dev_df['e high'][1]:
             # swap e low and e high values
-            temp_e = std_dev_df['e low'].values
-            std_dev_df['e low'] = std_dev_df['e high']
+            temp_e = list(std_dev_df['e low'].values)
+            std_dev_df['e low'] = list(std_dev_df['e high'])
             std_dev_df['e high'] = temp_e
 
         return std_dev_df, corr_df
@@ -240,13 +243,12 @@ def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, 
         max_e = max(high_e_bins)
     if min_e is None:
         min_e = min(high_e_bins) / 10
-        warn("Min e set to {0} eV since it was not provided".format(min_e))
+        warnings.warn("Min e set to {0} eV since it was not provided".format(min_e))
 
     if np.equal(min_e, min(high_e_bins.values)):
         raise Exception("Min e bin should be lower than the lowest high_e_bin")
 
     num_groups = len(high_e_bins)
-    grouped_dev = []
 
     # create bins so that they are actually bins and not just end points of the bins by adding the lowest end point
     e_bins_to_map_to = list(high_e_bins.values)
@@ -375,13 +377,15 @@ def get_mt_from_ace(ace_file, mt):
     """
 
     ace_path = os.path.expanduser(ace_file)
-    non_typical_xsec = [452]
+    non_typical_xsec = [452, 1018]
     if mt in non_typical_xsec:
 
         libFile = AceIO.AceEditor(ace_path)
         if mt == 452:
             # got an atypical mt
             e, st = libFile.get_nu_distro()
+        elif mt == 1018:
+            _, e, st, _ = libFile.get_chi_distro()
 
     else:
         libFile = AceIO.AceEditor(ace_path)
@@ -412,7 +416,10 @@ def set_log_scale(ax, log_x, log_y):
 def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zaid_2=None, mt_2=None, output_base='',
                       log_x=True, log_y=True, log_y_stddev=False, corr_rel_diff=False):
     """
-    Plots diag of cov, a few xsecs, and full corr matrix of the sampled data
+    Plots diag of cov, a few xsecs, and full corr matrix of the sampled data.
+
+    For mt=1018, only plots the first outgoing angle and the pdf
+
     Parameters
     ----------
     ace_file
@@ -466,6 +473,10 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     # if less than num_xsec samples, plot all of them
     if num_xsec > sample_df.shape[1]:
         num_xsec = sample_df.shape[1]
+
+    if mt == 1018:
+        e = e[0]
+        st = st[0]
 
     # plot the base x-sec too
     ax.plot(e, st, linestyle='-.', color='k')
@@ -571,6 +582,11 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, 
     # plot the xsec + the std_dev
     xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid, mt)
     e, st = get_mt_from_ace(ace_file, mt)
+
+    if mt == 1018:
+        e = e[0]
+        st = st[0]
+
     fig = plt.figure(figsize=(6, 4))
     gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1.3])
     ax = fig.add_subplot(gs[0])
@@ -718,47 +734,47 @@ if __name__ == "__main__":
     from coupleorigen import qsub_helper
     import argparse
 
-    # store_name = '../scale_cov_252.h5'
+    store_name = '../scale_cov_252.h5'
     # store_name = '../u235_18_44_group.h5'
     # store_name = '../u238_102_3_group/u238_102_3g.h5'
     # store_name = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/u235_102_44g_cov.h5'
-    #
-    # with pd.HDFStore(store_name, 'r') as h:
-    #     #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
-    #     ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
-    #     zaid = 92235
-    #     mts = [102, 452]
-    #     output_base = '../test/'
-    #
-    #     if rank == 0:
-    #         # num_samples_to_take is the nsamples that are actually written
-    #         # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
-    #         num_samples_to_take = 5
-    #         num_samples_to_make = num_samples_to_take
-    #
-    #         os.makedirs(output_base, exist_ok=True)
-    #         sample_dfs = []
-    #         sample_dfs_full = []
-    #         for mt in mts:
-    #             sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='uncorrelated', raise_on_bad_sample=False,
-    #                                                     remove_neg=True)
-    #
-    #             sample_df = sample_df.iloc[:, 0:num_samples_to_take]
-    #             sample_df_full = sample_df_full.iloc[:, 0:num_samples_to_take]
-    #
-    #             sample_dfs.append(sample_df)
-    #             sample_dfs_full.append(sample_df_full)
-    #
-    #             plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True,
-    #                               log_y_stddev=False)
-    #         #
-    #     else:
-    #         sample_dfs = None
-    #
-    #     sample_dfs = comm.bcast(sample_dfs, root=0)
-    #     write_sampled_data(h, ace_file, zaid, mts, sample_dfs, output_formatter=output_base + '/u28_{0}')
-    #
-    # exit(0)
+
+    with pd.HDFStore(store_name, 'r') as h:
+        #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
+        ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
+        zaid = 92235
+        mts = [1018]
+        output_base = '../test/'
+
+        if rank == 0:
+            # num_samples_to_take is the nsamples that are actually written
+            # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
+            num_samples_to_take = 500
+            num_samples_to_make = num_samples_to_take
+
+            os.makedirs(output_base, exist_ok=True)
+            sample_dfs = []
+            sample_dfs_full = []
+            for mt in mts:
+                sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='loguncorrelated', raise_on_bad_sample=False,
+                                                        remove_neg=True)
+
+                sample_df = sample_df.iloc[:, 0:num_samples_to_take]
+                sample_df_full = sample_df_full.iloc[:, 0:num_samples_to_take]
+
+                sample_dfs.append(sample_df)
+                sample_dfs_full.append(sample_df_full)
+
+                plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True,
+                                  log_y_stddev=False)
+            #
+        else:
+            sample_dfs = None
+
+        sample_dfs = comm.bcast(sample_dfs, root=0)
+        write_sampled_data(h, ace_file, zaid, mts, sample_dfs, output_formatter=output_base + '/u28_{0}')
+
+    exit(0)
 
     parser = create_argparser()
     args = parser.parse_args()

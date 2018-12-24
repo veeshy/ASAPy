@@ -42,10 +42,27 @@ class TestAceEditor(TestCase):
         self.assertAlmostEqual(e[4], 100.0)
         self.assertAlmostEqual(v[4], 2.4338)
 
+    def test_set_and_get_chi_distro(self):
+        """
+        Checks to make sure chi is actually set by setting it to a known value and checking the getter after.
+
+        Does not test the pdf/cdf logic for update of cdf based on pdf
+        """
+        ace = AceIO.AceEditor('./test_data/92235.710nc')
+        chi = ace.get_chi_distro()
+        gold_pdf = chi[2]
+        for idx in range(len(gold_pdf)):
+            gold_pdf[idx] = np.ones(len(gold_pdf[idx])) * 0
+
+        ace.set_chi_distro(gold_pdf)
+        check_chi = ace.get_chi_distro()
+
+        np.testing.assert_almost_equal(gold_pdf, check_chi[2])
+
+
     def test_set_and_get_nu_distro(self):
         """
-        Checks to make sure sigma is actually set by setting it to a known value and checking the getter after
-
+        Checks to make sure nu is actually set by setting it to a known value and checking the getter after
         """
         ace = AceIO.AceEditor('./test_data/92235.710nc')
         gold_sigma = ace.get_sigma(452) / 2

@@ -286,6 +286,17 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
 
     num_vars = len(mean_values)
 
+    # make sure mean/std dev are nonzero
+    if min(std_dev) == 0:
+        # set zero s.d. to a very small s.d.
+        min_nonzero_dev = 1e-7
+        std_dev[std_dev == 0] = min_nonzero_dev
+
+    if min(mean_values) == 0:
+        # raise Exception("Cannout sample negative or 0 values with log.. should make this a small pos numb..")
+        min_nonzero_mean = 1e-13
+        mean_values[mean_values == 0] = min_nonzero_mean
+
     if distro=='lognorm':
         # according to
         # G. Zerovnik, et. al. Transformation of correlation coefficients between normal and lognormal distribution and implications for nuclear applications

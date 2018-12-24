@@ -63,8 +63,10 @@ class AceEditor:
 
         """
 
-        if mt in [452]:
+        if mt == 452:
             energy, _ = self.get_nu_distro()
+        elif mt == 1018:
+            energy, _, _, _ = self.get_chi_distro()
         else:
             energy = self.table.energy[self.temperature]
 
@@ -75,6 +77,11 @@ class AceEditor:
         Gets the energy distribution from mt.
 
         Gets the prompt chi
+
+        Parameters
+        ----------
+        mt : int
+            The mt that represent fission for the desired chi distro
 
         Returns
         -------
@@ -113,6 +120,57 @@ class AceEditor:
 
         return fission_chi_prompt_energy, fission_chi_prompt_energy_out, fission_chi_prompt_energy_p, fission_chi_prompt_energy_c
 
+    def set_chi_distro(self, pdf, mt=18):
+        """
+        Sets chi based on a given pdf to set. Will also set cdf.
+
+        Parameters
+        ----------
+        pdf : list of ndarray
+            The PDF for the probability distribution of output energies to set
+        mt : int
+            The mt that represent fission for the desired chi distro
+
+        References
+        ----------
+        Zu thesis
+        """
+
+        fission_present = self._check_if_mts_present([mt])
+
+        if fission_present:
+            fission_chi_prompt_product = self.table.reactions[mt].products[0]
+            fission_chi_prompt = fission_chi_prompt_product.distribution[0].energy
+
+            if 'prompt' not in fission_chi_prompt_product.__repr__():
+                raise Exception("Prompt fission chi not found on mt {0} of {1}".format(mt, self.ace_path))
+
+            if len(fission_chi_prompt.energy_out) != len(pdf):
+                raise Exception("Number of out energies in pdf {0} not the same as ace {1}".format(
+                    len(pdf), len(fission_chi_prompt.energy_out)))
+
+            if len(fission_chi_prompt.energy_out[0]) != len(pdf[0]):
+                raise Exception("Number of bins in out energy in pdf {0} not the same as ace {1}".format(
+                    len(pdf[0]), len(fission_chi_prompt.energy_out[0])))
+
+            for idx, distro in enumerate(fission_chi_prompt.energy_out):
+                delta_pdf = pdf[idx] - distro.p
+                # get group deltas, knowing the first group should be 0 e which will also
+                # force the first level to be zero which by pdf definition is must
+                delta_e = np.diff(distro.x)
+                delta_e = np.insert(delta_e, 0, 0)
+                delta_cdf = delta_pdf * delta_e
+                # sum up the cdf deltas until the cdf point, inclusive
+                delta_cdf_sum = [sum(delta_cdf[0:i + 1]) for i in range(len(delta_cdf))]
+
+                normalization = distro.c[-1] + delta_cdf_sum[-1]
+
+                distro.c = (distro.c + delta_cdf_sum) / normalization
+                distro.p = pdf[idx] / normalization
+
+        else:
+            raise IndexError("No fission MT={mt} present on ace file {ace}".format(mt=mt, ace=self.ace_path))
+
     def get_nu_distro(self):
         """
         Finds \chi_T table.
@@ -147,6 +205,15 @@ class AceEditor:
 
         return nu_t_e, nu_t_value
 
+    def set_nu_distro(self, nu_values):
+        """
+        Sets nu values
+        Parameters
+        ----------
+        nu_values : list-like
+            nu values to set
+        """
+        self.table.reactions[18].derived_products[0].yield_.y = nu_values
 
 
     def get_sigma(self, mt, at_energies=None):
@@ -159,13 +226,15 @@ class AceEditor:
         Returns
         -------
         np.array
-            xsec values
+            xsec values unless MT=452 (then nu-bar values), or MT=1018 (then chi pdf matrix)
 
         """
 
         # handle nu differently than other xsec
-        if mt in [452]:
+        if mt == 452:
             _, sigma = self.get_nu_distro()
+        elif mt == 1018:
+            _, _, sigma, _ = self.get_chi_distro()
         else:
             try:
                 rx = self.table.reactions[mt].xs[self.temperature]
@@ -179,27 +248,34 @@ class AceEditor:
 
         return sigma
 
-    def set_sigma(self, mt, sigma):
+    def set_sigma(self, mt, values_to_set):
         """
-        Sets the mt sigma and adds the mt to the changed sigma set
+        Sets the mt sigma and adds the mt to the changed sigma set.
+
+        Works for nu-bar MT=452 with sigma as the new nu values and
+              for chi MT=1018 with sigma as the new PDF list of nd.arrays to set
+
         Parameters
         ----------
         mt : int
-        sigma : nd.array
+        values_to_set : nd.array
         """
 
         energy = self.get_energy(mt)
-        if len(sigma) != len(energy):
-            raise IndexError('Length of sigma provided does not match energy bins got: {0}, needed: {1}'.format(len(sigma), len(energy)))
+        if len(values_to_set) != len(energy):
+            raise IndexError('Length of values_to_set provided does not match energy bins got: {0}, needed: {1}'.format(
+                len(values_to_set), len(energy)))
 
-        current_sigma = self.get_sigma(mt)
         if mt not in self.original_sigma.keys():
+            current_sigma = self.get_sigma(mt)
             self.original_sigma[mt] = current_sigma.copy()
 
-        if mt in [452]:
-            self.table.reactions[18].derived_products[0].yield_.y = sigma
+        if mt == 452:
+            self.set_nu_distro(values_to_set)
+        elif mt == 1018:
+            self.set_chi_distro(values_to_set)
         else:
-            self.table.reactions[mt].xs[self.temperature].y = sigma
+            self.table.reactions[mt].xs[self.temperature].y = values_to_set
 
         self.adjusted_mts.add(mt)
 
