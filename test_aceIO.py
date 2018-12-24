@@ -3,6 +3,8 @@ import unittest
 import filecmp
 import os
 
+import numpy as np
+
 from ASAPy import AceIO
 
 class TestAceEditor(TestCase):
@@ -39,6 +41,18 @@ class TestAceEditor(TestCase):
         [e, v] = self.ace.get_nu_distro()
         self.assertAlmostEqual(e[4], 100.0)
         self.assertAlmostEqual(v[4], 2.4338)
+
+    def test_set_and_get_nu_distro(self):
+        """
+        Checks to make sure sigma is actually set by setting it to a known value and checking the getter after
+
+        """
+        ace = AceIO.AceEditor('./test_data/92235.710nc')
+        gold_sigma = ace.get_sigma(452) / 2
+        ace.set_sigma(452, gold_sigma)
+        check_sigma = ace.get_sigma(452)
+
+        np.testing.assert_almost_equal(gold_sigma, check_sigma)
 
     def test_get_sigma(self):
         v = self.ace.get_sigma(2)

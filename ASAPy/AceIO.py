@@ -197,7 +197,7 @@ class AceEditor:
             self.original_sigma[mt] = current_sigma.copy()
 
         if mt in [452]:
-            self.table.nu_t_value = sigma
+            self.table.reactions[18].derived_products[0].yield_.y = sigma
         else:
             self.table.reactions[mt].xs[self.temperature].y = sigma
 
@@ -347,7 +347,7 @@ class WriteAce:
 
         return original_str_line
 
-    def replace_array(self, array, replace_with):
+    def replace_array(self, array, replace_with, max_replaces=1):
         """
         Replaces array with replace_with in the currently read ace file
 
@@ -355,6 +355,8 @@ class WriteAce:
         ----------
         array : list-like
         replace_with : list-like
+        max_replaces : int
+            Max number of times to replace array found
         """
 
         if len(array) != len(replace_with):
@@ -371,7 +373,7 @@ class WriteAce:
 
         replace_with_line = self.format_mcnp(replace_with)
         self.single_line = self.single_line.replace(self.single_line[first_idx_of_data: last_idx_of_data],
-                                                    replace_with_line, 1)
+                                                    replace_with_line, max_replaces)
 
     def write_ace(self, ace_path_to_write):
 
