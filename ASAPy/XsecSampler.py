@@ -18,7 +18,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 class XsecSampler:
-    def __init__(self, h, zaid_1, mt_1, zaid_2=None, mt_2=None, remove_negative_eig=False):
+    def __init__(self, h, zaid_1, mt_1, zaid_2=None, mt_2=None, remove_negative_eig=True):
         """
         Sampling methods for cross-sections
         Parameters
@@ -40,7 +40,7 @@ class XsecSampler:
             self.corr_df.loc[:, :] = self._fix_non_pos_semi_def_matrix_eigen(self.corr_df.values)
 
     @staticmethod
-    def load_zaid_mt(h, zaid_1, mt_1, zaid_2=None, mt_2=None):
+    def load_zaid_mt(h, zaid_1, mt_1, zaid_2=None, mt_2=None, fill_corr_diag=False):
         """
         Loads the relevant std dev and corr df's
         Parameters
@@ -50,6 +50,8 @@ class XsecSampler:
         mt_1 : int or str
         zaid_2 : None or int or str
         mt_2 : None or int or str
+        fill_corr_diag : bool
+            Sets diag of correlation matrix to 1.0 in case original format did not do this
         """
         if zaid_2 is None:
             zaid_2 = zaid_1
@@ -60,8 +62,9 @@ class XsecSampler:
         std_dev_df = h['{0}/{1}/{2}/{3}/std_dev'.format(zaid_1, mt_1, zaid_2, mt_2)]
         corr_df = h['{0}/{1}/{2}/{3}/corr'.format(zaid_1, mt_1, zaid_2, mt_2)]
         # ensure diagonals and matrix normalized to 1.0 + have 1.0 on the diag
-        np.fill_diagonal(corr_df.values, 1000)  # boxer format used 1000 as 1.0 for correlations
-        corr_df = corr_df / corr_df.loc[1, 1]
+        if fill_corr_diag:
+            np.fill_diagonal(corr_df.values, 1000.0)  # boxer format used 1000 as 1.0 for correlations
+        corr_df = corr_df / 1000.0
 
 
         # make sure e low and e high are in the correct order
@@ -197,9 +200,9 @@ class XsecSampler:
 
         eigs, P = LA.eigh(corr_matrix)
         if min(eigs) <= 1e-8:
-            print('eig_replace: got eig', min(eigs))
             # replace all negative and zero eigs with a small eps
             bad_index = np.where(eigs <= 1e-8)
+            print('eig_replace: got min eig', min(eigs), 'with', len(bad_index), ' eigenvalue less than 1e-8')
 
             # set to some small number
             eigs[bad_index] = min(1e-8 * max(eigs), 1e-8)
@@ -356,6 +359,10 @@ def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', rem
 
     sample_df = xsec._sample_check(sample_df_full_vals.T, mean, remove_neg=False)
 
+    # if a NaN is found at this point, it's because the sample_df (rel) calc divided by 0 mean,
+    # set the rel dev to the value sampled + 1.0. Later we can check if mean = 0 and if it is just use rel dev
+    sample_df[sample_df.isna()] = sample_df_full_vals[sample_df.isna()]
+
     return sample_df, sample_df_full_vals
 
 def get_mt_from_ace(ace_file, mt):
@@ -488,7 +495,10 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     # plot the base again so it appears on top
     ax.plot(e, st, linestyle='-.', color='k')
 
-    if max(st)/min(st) > 1000:
+    # to see if we should log, check only nonzero values
+    # let it be ugly if zome zeros found?
+    nonzero_st = st[np.nonzero(st)]
+    if max(nonzero_st)/min(nonzero_st) > 1000:
         set_log_scale(ax, log_x, True)
     else:
         set_log_scale(ax, log_x, False)
@@ -529,6 +539,12 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
         corr_for_plot = np.abs(np.corrcoef(sample_df_full_vals) - corr.values)
     else:
         corr_for_plot = np.corrcoef(sample_df_full_vals)
+        corr_for_plot[np.isnan(corr_for_plot)] = 0
+
+        # if the original corr was 0 on the diag, the sampled distro was not actually sampled so lets not plot that
+        original_corr_zero_idx = np.diag(corr.values) == 0
+        corr_for_plot[:, original_corr_zero_idx] = 0
+        corr_for_plot[original_corr_zero_idx, :] = 0
 
     corr_flipped_for_plot = np.flipud(np.fliplr(corr_for_plot))
     im = ax[1].pcolormesh(X, Y, corr_flipped_for_plot)
@@ -673,7 +689,19 @@ def write_sampled_data(h, ace_file, zaid, mts, sample_dfs_rel, output_formatter=
             e = ae.get_energy(mt)
             original_sigma = ae.get_sigma(mt)
 
-            sampled_xsec = map_groups_to_continuous(e, xsec['e high'], col, min_e=xsec['e low'].min()) * original_sigma
+            if mt == 1018:
+                # assumes all incident n / e_out have the SAME pdf relative samples
+                sampled_xsec = []
+                for pdf_for_e_out, e_to_map_on in zip(original_sigma, e):
+                    sampled_xsec.append(map_groups_to_continuous(e_to_map_on, xsec['e high'], col,
+                                                                 min_e=xsec['e low'].min()) * pdf_for_e_out)
+            else:
+                # in case we get a 0 mean set it to 1.0. The sample_df sets rel_dev
+                if original_sigma == 0:
+                    original_sigma = 1
+
+                sampled_xsec = map_groups_to_continuous(e, xsec['e high'], col,
+                                                        min_e=xsec['e low'].min()) * original_sigma
 
             ae.set_sigma(mt, sampled_xsec)
             ae.apply_sum_rules()
@@ -689,7 +717,15 @@ def write_sampled_data(h, ace_file, zaid, mts, sample_dfs_rel, output_formatter=
                     max_replaces = 9999
                 else:
                     max_replaces = 1
-                w.replace_array(base_ace.get_sigma(mt_adjusted), ae.get_sigma(mt_adjusted), max_replaces)
+
+                if mt_adjusted == 1018:
+                    base = base_ace.get_sigma(mt_adjusted)
+                    sampled = ae.get_sigma(mt_adjusted)
+                    for _base, _sampled in zip(base, sampled):
+                        # prob/MeV converted back to per eV
+                        w.replace_array(_base * 1e6, _sampled * 1e6, max_replaces=1)
+                else:
+                    w.replace_array(base_ace.get_sigma(mt_adjusted), ae.get_sigma(mt_adjusted), max_replaces)
             except ValueError:
                 print("MT {0} adjusted but was not present on original ace, perhaps it was redundant".format(mt_adjusted))
 
@@ -749,14 +785,14 @@ if __name__ == "__main__":
         if rank == 0:
             # num_samples_to_take is the nsamples that are actually written
             # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
-            num_samples_to_take = 500
+            num_samples_to_take = 5
             num_samples_to_make = num_samples_to_take
 
             os.makedirs(output_base, exist_ok=True)
             sample_dfs = []
             sample_dfs_full = []
             for mt in mts:
-                sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='loguncorrelated', raise_on_bad_sample=False,
+                sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='lognorm', raise_on_bad_sample=False,
                                                         remove_neg=True)
 
                 sample_df = sample_df.iloc[:, 0:num_samples_to_take]

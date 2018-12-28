@@ -284,18 +284,32 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
 
     """
 
-    num_vars = len(mean_values)
+    mean_values_original = np.array(mean_values)
+    desired_corr = np.array(desired_corr)
 
-    # make sure mean/std dev are nonzero
+    # make sure mean/std dev are nonzero for some cases since distro functions can't handle 0 sigma
+    vars_to_not_sample_idx = None
+
     if min(std_dev) == 0:
-        # set zero s.d. to a very small s.d.
-        min_nonzero_dev = 1e-7
-        std_dev[std_dev == 0] = min_nonzero_dev
+        set_fix_val_idx = std_dev == 0
+        vars_to_not_sample_idx = list(set_fix_val_idx)
 
     if min(mean_values) == 0:
-        # raise Exception("Cannout sample negative or 0 values with log.. should make this a small pos numb..")
-        min_nonzero_mean = 1e-13
-        mean_values[mean_values == 0] = min_nonzero_mean
+        # cannot sample 0 mean with lognorm
+        if distro == 'lognorm':
+            set_zero_mean_idx = mean_values == 0
+
+            if vars_to_not_sample_idx is not None:
+                vars_to_not_sample_idx = [i + j for i,j in zip(vars_to_not_sample_idx, set_zero_mean_idx)]
+
+    # only sample from things that are deemed sampleable
+    if vars_to_not_sample_idx:
+        vars_to_sample = np.invert(vars_to_not_sample_idx)
+        mean_values = mean_values[vars_to_sample]
+        std_dev = std_dev[vars_to_sample]
+        desired_corr = desired_corr[vars_to_sample, :][:, vars_to_sample]
+
+    num_vars = len(mean_values)
 
     if distro=='lognorm':
         # according to
@@ -353,8 +367,8 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
         mean = [np.log(mean_values[i] / (1 + std_dev[i] ** 2 / mean_values[i] ** 2) ** 0.5) for i in range(num_vars)]
         sigma = [(np.log(1 + std_dev[i] ** 2 / mean_values[i] ** 2)) ** 0.5 for i in range(num_vars)]
 
-        mean_values = mean
-        std_dev = sigma
+        mean_values = np.array(mean)
+        std_dev = np.array(sigma)
         distro_to_sample_from = sci_norm
 
     elif distro == 'uniform':
@@ -383,6 +397,20 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
         dists[np.isnan(dists)] = 1
 
     dists = order(R, dists.T)
+
+    # ensure 0 mean and 0 std_dev values are not actually sampled
+    # if set_zero_mean:
+    #     dists[:, set_zero_mean_idx] = 0
+    #
+    # if set_fixed_val:
+    #     dists[:, set_fix_val_idx] = mean_values_original[set_fix_val_idx]
+
+    if vars_to_not_sample_idx:
+        dists_with_all_data = np.zeros((num_samples, len(vars_to_not_sample_idx)))
+        dists_with_all_data[:, np.invert(vars_to_not_sample_idx)] = dists
+        dists_with_all_data[:, vars_to_not_sample_idx] = mean_values_original[vars_to_not_sample_idx]
+
+        dists = dists_with_all_data
 
     return dists
 

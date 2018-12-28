@@ -66,7 +66,7 @@ class AceEditor:
         if mt == 452:
             energy, _ = self.get_nu_distro()
         elif mt == 1018:
-            energy, _, _, _ = self.get_chi_distro()
+            _, energy, _, _ = self.get_chi_distro()
         else:
             energy = self.table.energy[self.temperature]
 
@@ -97,6 +97,7 @@ class AceEditor:
         fission_present = self._check_if_mts_present([mt])
 
         if fission_present:
+            # get the prompt neutron yield.
             fission_chi_prompt_product = self.table.reactions[mt].products[0]
             fission_chi_prompt = fission_chi_prompt_product.distribution[0].energy
 
@@ -418,6 +419,7 @@ class WriteAce:
         -------
         list
         """
+
         original_str_formatted = [format(s, formatting) for s in array]
         original_str_line = ' '.join(original_str_formatted)
 
