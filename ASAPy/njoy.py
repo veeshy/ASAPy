@@ -179,7 +179,8 @@ nu and chi /
     s += "0/\n"
     return s
 
-_TEMPLATE_GROUPR_FOR_XSEC = """
+def _TEMPLATE_GROUPR_FOR_XSEC(num_temps):
+    s = """
 groupr / %%%%%%%%%%%%%%%%%%%%%%%% Create shielded xsec %%%%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {ngroupr_in} 0 {ngroupr_out}/
 {mat} 1 0 {iwt_fluxweight} 1 {num_temp}/ user groups, weight flux
@@ -188,12 +189,15 @@ xsec /
 1e10/ background sigma (need to include "inf")/
 {cov_ngroups}/
 {cov_group_bounds}/
-3/
-0/
-0/
 """
 
-_TEMPLATE_GROUPR_FOR_XSEC_USER_FLUX = """
+    for t in range(num_temps):
+        s += "3/\n0/\n"
+
+    return s + "0/\n"
+
+def _TEMPLATE_GROUPR_FOR_XSEC_USER_FLUX(num_temps):
+    s = """
 groupr / %%%%%%%%%%%%%%%%%%%%%%%% Create shielded xsec %%%%%%%%%%%%%%%%%%%%%%%%%
 {nendf} {ngroupr_in} 0 {ngroupr_out}/
 {mat} 1 0 1 1 {num_temp}/ user groups, user weight flux
@@ -203,10 +207,12 @@ xsec /
 {cov_ngroups}/
 {cov_group_bounds}/
 {user_flux_weight}/
-3/
-0/
-0/
 """
+
+    for t in range(num_temps):
+        s += "3/\n0/\n"
+
+    return s + "0/\n"
 
 
 _THERMAL_TEMPLATE_THERMR = """
@@ -535,9 +541,9 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             cov_group_bounds = ' \n'.join(cov_group_bounds)
 
             if iwt_fluxweight == 1:
-                commands += _TEMPLATE_GROUPR_FOR_XSEC_USER_FLUX.format(**locals())
+                commands += _TEMPLATE_GROUPR_FOR_XSEC_USER_FLUX(num_temp).format(**locals())
             else:
-                commands += _TEMPLATE_GROUPR_FOR_XSEC.format(**locals())
+                commands += _TEMPLATE_GROUPR_FOR_XSEC(num_temp).format(**locals())
 
             commands += _TEMPLATE_ERRORR_33.format(**locals())
             if iwt_fluxweight == 1:
