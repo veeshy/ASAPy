@@ -384,11 +384,11 @@ if __name__ == "__main__":
     #
     #     AsapyCovStorage.add_stddev_to_store(h, df, '1001', '102', '1001', '102')
 
-    mt = 102
+    mts = [18, 102]
     zaid = 92235
-    output_dir = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/'
+    output_dir = '/Users/veeshy/projects/ASAPy/u235/'
 
-    cov_groups = [njoy.energy_groups_44, njoy.energy_groups_56, njoy.energy_groups_252]
+    # cov_groups = [njoy.energy_groups_44, njoy.energy_groups_56, njoy.energy_groups_252]
     cov_groups = [njoy.energy_groups_44]
 
     # from low to high, (e, flux_val) pairs
@@ -439,28 +439,21 @@ if __name__ == "__main__":
                              1.384e+07, 1.369027e-07, 1.455e+07, 4.962589e-08, 1.5683e+07, 3.75955e-08, 1.7333e+07,
                              2.094257e-08, 2e+07, 8.083706e-09]
 
-    nu = False
+    nu = True
     chi = False
 
     for cov_energy_group in cov_groups:
-        run_cover_chain("/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf", [mt], [300],
+        run_cover_chain("/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf", mts, [300],
                         output_dir=output_dir, cov_energy_groups=cov_energy_group, iwt_fluxweight=9,
                         user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi)
-
-        process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
-                          output_h5_format='u235_102_{0}g_cov.h5')
-
-        if chi:
-            process_cov_to_h5(output_dir, zaid, 452, boxer_matrix_name='covr_nu_300.txt_{mt}_matrix.txt',
+        for mt in mts:
+            process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
                               output_h5_format='u235_102_{0}g_cov.h5')
 
         if nu:
-            process_cov_to_h5(output_dir, zaid, 18, boxer_matrix_name='covr_chi_300.txt_{mt}_matrix.txt',
+            process_cov_to_h5(output_dir, zaid, 452, boxer_matrix_name='covr_nu_300.txt_{mt}_matrix.txt',
                               output_h5_format='u235_102_{0}g_cov.h5')
 
-
-# for each mat/mt cov:
-#   read the tape.21 outputs (mat_mt_mat_mt.mat)
-#   parse the group bounds, xsec, std_dev, correlation matrix  done!
-#   create stddev and corr df
-#   store these
+        if chi:
+            process_cov_to_h5(output_dir, zaid, 18, boxer_matrix_name='covr_chi_300.txt_{mt}_matrix.txt',
+                              output_h5_format='u235_102_{0}g_cov.h5')
