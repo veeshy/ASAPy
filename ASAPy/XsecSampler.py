@@ -770,47 +770,47 @@ if __name__ == "__main__":
     from coupleorigen import qsub_helper
     import argparse
 
-    store_name = '../scale_cov_252.h5'
-    # store_name = '../u235_18_44_group.h5'
-    # store_name = '../u238_102_3_group/u238_102_3g.h5'
-    # store_name = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/u235_102_44g_cov.h5'
-
-    with pd.HDFStore(store_name, 'r') as h:
-        #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
-        ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
-        zaid = 92235
-        mts = [1018]
-        output_base = '../test/'
-
-        if rank == 0:
-            # num_samples_to_take is the nsamples that are actually written
-            # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
-            num_samples_to_take = 5
-            num_samples_to_make = num_samples_to_take
-
-            os.makedirs(output_base, exist_ok=True)
-            sample_dfs = []
-            sample_dfs_full = []
-            for mt in mts:
-                sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='lognorm', raise_on_bad_sample=False,
-                                                        remove_neg=True)
-
-                sample_df = sample_df.iloc[:, 0:num_samples_to_take]
-                sample_df_full = sample_df_full.iloc[:, 0:num_samples_to_take]
-
-                sample_dfs.append(sample_df)
-                sample_dfs_full.append(sample_df_full)
-
-                plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True,
-                                  log_y_stddev=False)
-            #
-        else:
-            sample_dfs = None
-
-        sample_dfs = comm.bcast(sample_dfs, root=0)
-        write_sampled_data(h, ace_file, zaid, mts, sample_dfs, output_formatter=output_base + '/u28_{0}')
-
-    exit(0)
+    # store_name = '../scale_cov_252.h5'
+    # # store_name = '../u235_18_44_group.h5'
+    # # store_name = '../u238_102_3_group/u238_102_3g.h5'
+    # # store_name = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/u235_102_44g_cov.h5'
+    #
+    # with pd.HDFStore(store_name, 'r') as h:
+    #     #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
+    #     ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
+    #     zaid = 92235
+    #     mts = [1018]
+    #     output_base = '../test/'
+    #
+    #     if rank == 0:
+    #         # num_samples_to_take is the nsamples that are actually written
+    #         # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
+    #         num_samples_to_take = 5
+    #         num_samples_to_make = num_samples_to_take
+    #
+    #         os.makedirs(output_base, exist_ok=True)
+    #         sample_dfs = []
+    #         sample_dfs_full = []
+    #         for mt in mts:
+    #             sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_make, sample_type='lognorm', raise_on_bad_sample=False,
+    #                                                     remove_neg=True)
+    #
+    #             sample_df = sample_df.iloc[:, 0:num_samples_to_take]
+    #             sample_df_full = sample_df_full.iloc[:, 0:num_samples_to_take]
+    #
+    #             sample_dfs.append(sample_df)
+    #             sample_dfs_full.append(sample_df_full)
+    #
+    #             plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base, log_y=True,
+    #                               log_y_stddev=False)
+    #         #
+    #     else:
+    #         sample_dfs = None
+    #
+    #     sample_dfs = comm.bcast(sample_dfs, root=0)
+    #     write_sampled_data(h, ace_file, zaid, mts, sample_dfs, output_formatter=output_base + '/u28_{0}')
+    #
+    # exit(0)
 
     parser = create_argparser()
     args = parser.parse_args()
