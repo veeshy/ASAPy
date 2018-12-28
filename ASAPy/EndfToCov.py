@@ -23,7 +23,8 @@ _BOXER_TEMPLATE = """0,{mat},{mt},{mat},{mt}
 """
 
 def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename=None, stdout=True,
-                    njoy_exec='../boxer2mat/boxer2mat', boxer_exec='../boxer2mat/boxer2mat', output_base_path='./'):
+                    njoy_exec='../boxer2mat/boxer2mat', boxer_exec='../boxer2mat/boxer2mat', output_base_path='./',
+                    use_temp_folder=True):
     """Run NJOY to create a cov matrix in easily readable format by
     converting the BOXER output to matrix form
 
@@ -45,6 +46,8 @@ def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, 
         Path to NJOY executable
     base_file_name : str, optional
         The base file that the executable uses (likely tape or fort.)
+    use_temp_folder : bool
+        Option to output all intermediate files to a temp folder
 
     Raises
     ------
@@ -54,8 +57,10 @@ def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, 
     """
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # uncomment to run in output path
-        # tmpdir = output_base_path
+        # override the tmpfile path
+        if not use_temp_folder:
+            tmpdir = output_base_path
+
         # Copy evaluations to appropriates 'tapes'
         for tape_num, filename in tapein.items():
             tmpfilename = os.path.join(tmpdir, 'tape{}'.format(tape_num))
@@ -70,19 +75,21 @@ def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, 
                 shutil.copy(tmpfilename, os.path.join(output_base_path, filename))
 
         # Convert the cov boxer out to matrix form
-        for mt, cover_tape in zip(mts, cover_tapes.items()):
-            tape_num, file_name = cover_tape
-            # the nin for boxer2matrix
-            tempnjoycovtape = os.path.join(tmpdir, 'tape{}'.format(tape_num))
-            tmpboxerfilename_in = os.path.join(tmpdir, 'fort.20')
-            tmpboxerfilename_out = os.path.join(tmpdir, 'fort.21')
-            shutil.move(tempnjoycovtape, tmpboxerfilename_in)
-            # use the same input multiple times for diff MTs
-            # run boxer
-            boxer_commands = _BOXER_TEMPLATE.format(mat=mat_num, mt=mt)
-            run_program(boxer_commands, boxer_exec, stdout, tmpdir, os.path.join(output_base_path, input_filename + "boxer.txt"))
-            # save the output locally
-            shutil.move(tmpboxerfilename_out, os.path.join(output_base_path, file_name + "_" + str(mt) + "_matrix.txt"))
+        # each cover tape should be a different temp or material so loop over them and parse all mts
+        for cover_tape in cover_tapes.items():
+            for mt in mts:
+                tape_num, file_name = cover_tape
+                # the nin for boxer2matrix
+                tempnjoycovtape = os.path.join(tmpdir, 'tape{}'.format(tape_num))
+                tmpboxerfilename_in = os.path.join(tmpdir, 'fort.20')
+                tmpboxerfilename_out = os.path.join(tmpdir, 'fort.21')
+                shutil.copy(tempnjoycovtape, tmpboxerfilename_in)
+                # use the same input multiple times for diff MTs
+                # run boxer
+                boxer_commands = _BOXER_TEMPLATE.format(mat=mat_num, mt=mt)
+                run_program(boxer_commands, boxer_exec, stdout, tmpdir, os.path.join(output_base_path, input_filename + "boxer.txt"))
+                # save the output locally
+                shutil.move(tmpboxerfilename_out, os.path.join(output_base_path, file_name + "_" + str(mt) + "_matrix.txt"))
 
 
 def run_program(commands, executable_path, stdout, run_dir, write_input_file=None):
@@ -259,7 +266,7 @@ class read_boxer_out_matrix:
         return values
 
 def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_groups=None,
-                    iwt_fluxweight=9, user_flux_weight_vals=None, nu=False, chi=False):
+                    iwt_fluxweight=9, user_flux_weight_vals=None, nu=False, chi=False, use_temp_folder=True):
     """
     Creates cov matrix and plots for mts and temperatures for the end file
     Parameters
@@ -271,10 +278,12 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
     cov_energy_groups
     iwt_fluxweight : int
         NJOY built-in flux weights: 3=1/E, 9=claw
-
-    Returns
-    -------
-
+    nu : bool
+        Run with nubar cov
+    chi : bool
+        Run with chi cov
+    use_temp_folder : bool
+        Option to output all intermediate files to output_base_path
     """
 
     if not isinstance(mts, list):
@@ -307,7 +316,8 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
 
     _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename="testing_chain.txt",
                      stdout=True, njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy',
-                     boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat', output_base_path=output_dir)
+                     boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat', output_base_path=output_dir,
+                     use_temp_folder=use_temp_folder)
 
 
 def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',

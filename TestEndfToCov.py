@@ -50,13 +50,12 @@ class TestRunCoverChain(TestCase):
         for file in files:
             with open(os.path.join(gold_dir, file)) as g:
                 with open(os.path.join(self.test_dir, file)) as t:
-                    gold_lines = ' '.join(g.readlines())
-                    test_lines = ' '.join(t.readlines())
-                    self.assertMultiLineEqual(gold_lines, test_lines, msg="File: {0}".format(file))
+                    gold_lines = g.readlines()
+                    test_lines = t.readlines()
+                    for gold_line, test_line in zip(gold_lines, test_lines):
+                        self.assertMultiLineEqual(gold_line, test_line, msg="File: {0}".format(file))
 
             os.remove(os.path.join(self.test_dir, file))
-
-        self.assertEquals(1,1)
 
     def tearDown(self):
         try:
