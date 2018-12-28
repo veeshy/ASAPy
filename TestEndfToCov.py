@@ -36,7 +36,8 @@ class TestRunCoverChain(TestCase):
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
         os.makedirs(self.test_dir)
-        EndfToCov.run_cover_chain("./test_data/n_0125_1-H-1.dat", [2, 102], [300, 2400], output_dir=self.test_dir)
+        EndfToCov.run_cover_chain("./test_data/n_0125_1-H-1.dat", [2, 102], [300, 2400], output_dir=self.test_dir,
+                                  user_flux_weight_vals=6)
 
         # check each file against gold
 
@@ -54,6 +55,8 @@ class TestRunCoverChain(TestCase):
                     self.assertMultiLineEqual(gold_lines, test_lines, msg="File: {0}".format(file))
 
             os.remove(os.path.join(self.test_dir, file))
+
+        self.assertEquals(1,1)
 
     def tearDown(self):
         try:
