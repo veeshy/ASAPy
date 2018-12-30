@@ -63,8 +63,8 @@ class XsecSampler:
         corr_df = h['{0}/{1}/{2}/{3}/corr'.format(zaid_1, mt_1, zaid_2, mt_2)]
         # ensure diagonals and matrix normalized to 1.0 + have 1.0 on the diag
         if fill_corr_diag:
-            np.fill_diagonal(corr_df.values, 1000.0)  # boxer format used 1000 as 1.0 for correlations
-        corr_df = corr_df / 1000.0
+            np.fill_diagonal(corr_df.values, max(np.diag(corr_df.values)))  # boxer format used 1000 as 1.0 for correlations
+        corr_df = corr_df / max(np.diag(corr_df.values))
 
 
         # make sure e low and e high are in the correct order
@@ -770,6 +770,7 @@ if __name__ == "__main__":
     import argparse
 
     # store_name = '../scale_cov_252.h5'
+    # # store_name = '../u235/u235_102_44g_cov.h5'
     # # store_name = '../u235_18_44_group.h5'
     # # store_name = '../u238_102_3_group/u238_102_3g.h5'
     # # store_name = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/u235_102_44g_cov.h5'
@@ -778,7 +779,7 @@ if __name__ == "__main__":
     #     #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
     #     ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
     #     zaid = 92235
-    #     mts = [1018]
+    #     mts = [18]
     #     output_base = '../test/'
     #
     #     if rank == 0:
