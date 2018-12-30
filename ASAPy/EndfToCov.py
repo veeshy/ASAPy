@@ -289,11 +289,19 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
     if not isinstance(mts, list):
         mts = [mts]
 
+    mts = list(mts)
+
     if not isinstance(temperatures, list):
         temperatures = [temperatures]
 
     if not cov_energy_groups:
         cov_energy_groups = njoy.energy_groups_238
+
+    # ensure mt = 18 is processed, might not need this exception..
+    if chi:
+        if 18 in mts:
+            raise Exception("Ambiguous parsing when both fission chi spectrum and mt=18 requested, please do one at a time.")
+        mts.append(18)
 
     mat_num = njoy.get_mat_from_endf(endf_file)
     njoy_commands, tapein, tapeout = njoy.make_njoy_run(endf_file, temperatures=temperatures, pendf=None, error=0.001,
@@ -308,11 +316,6 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
 
     if nu:
         mts.append(452)
-
-    if chi:
-        if 18 in mts:
-            raise Exception("Ambiguous parsing when both fission chi spectrum and mt=18 requested, please do one at a time.")
-        mts.append(18)
 
     _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename="testing_chain.txt",
                      stdout=True, njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy',
@@ -385,8 +388,12 @@ if __name__ == "__main__":
     #     AsapyCovStorage.add_stddev_to_store(h, df, '1001', '102', '1001', '102')
 
     mts = [18, 102]
+    nu = True
+    chi = False
     zaid = 92235
-    output_dir = '/Users/veeshy/projects/ASAPy/u235/'
+    output_dir = '/Users/veeshy/projects/ASAPy/u235_viii/'
+    # endf_file = "/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf"
+    endf_file = "/Users/veeshy/Downloads/ENDF-B-VIII.0_neutrons/n-092_U_235.endf"
 
     # cov_groups = [njoy.energy_groups_44, njoy.energy_groups_56, njoy.energy_groups_252]
     cov_groups = [njoy.energy_groups_44]
@@ -439,11 +446,8 @@ if __name__ == "__main__":
                              1.384e+07, 1.369027e-07, 1.455e+07, 4.962589e-08, 1.5683e+07, 3.75955e-08, 1.7333e+07,
                              2.094257e-08, 2e+07, 8.083706e-09]
 
-    nu = True
-    chi = False
-
     for cov_energy_group in cov_groups:
-        run_cover_chain("/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf", mts, [300],
+        run_cover_chain(endf_file, mts, [300],
                         output_dir=output_dir, cov_energy_groups=cov_energy_group, iwt_fluxweight=9,
                         user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi)
         for mt in mts:
