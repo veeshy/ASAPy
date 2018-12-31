@@ -301,10 +301,21 @@ covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (PLOT) %%%%%%%%%%%%%%%%%%%%%%%%
 
     return s
 
+# this outputs correlation matrix
 _TEMPLATE_COVR_FOR_LIB = """
 covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (DATA) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nerr} {covr_out}/
 4/
+corr/
+/
+{mat}/
+"""
+
+# this outputs cov matrix in care correlation matrix has problems like for fission chi
+_TEMPLATE_COVR_FOR_LIB_COV_OUT = """
+covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (DATA) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{nerr} {covr_out}/
+3/
 corr/
 /
 {mat}/
@@ -567,8 +578,8 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
                 commands += _TEMPLATE_COVR_FOR_PLOT(covr_plot_mts).format(**locals())
                 commands += _TEMPLATE_VIEWR.format(**locals())
 
-        if nu:
-            commands += "\n-- Nu-bar info\n"
+        if nu or chi:
+            commands += "\n-- Nu-bar / Chi groupr\n"
             ngroupr_in = nbroadr  # PENDF tape
             ngroupr_out = nlast + 1
             s = _TEMPLATE_GROUPR_FOR_PLOT(num_temp)
@@ -576,6 +587,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
 
             nlast += 1
 
+        if nu:
             nerr_in = nbroadr  # PENDF tape
             nerr = nlast + 1
             commands += _TEMPLATE_ERRORR_31.format(**locals())
@@ -608,7 +620,6 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
                 commands += user_flux_weight + "/\n"
             nlast += 1
 
-
             covr_plot_out = nlast + 1   # needed as input to viewr
             nlast += 1
 
@@ -622,7 +633,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             tapeout[covr_out] = fname.format("covr_chi", temperature) + ".txt"
             tapeout[viewr_plot_out] = fname.format("viewr_chi", temperature) + ".eps"
             nlast += 1
-            commands += _TEMPLATE_COVR_FOR_LIB.format(**locals())
+            commands += _TEMPLATE_COVR_FOR_LIB_COV_OUT.format(**locals())
 
 
 
