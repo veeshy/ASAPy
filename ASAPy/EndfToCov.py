@@ -16,13 +16,6 @@ from ASAPy import AsapyCovStorage
 from ASAPy import njoy
 from ASAPy import CovManipulation
 
-_BOXER_TEMPLATE = """0,{mat},{mt},{mat},{mt}
-1,{mat},{mt},{mat},{mt}
-2,{mat},{mt},{mat},{mt}
-4,{mat},{mt},{mat},{mt}
-0,0
-"""
-
 _BOXER_TEMPLATE_COV = """0,{mat},{mt},{mat},{mt}
 1,{mat},{mt},{mat},{mt}
 2,{mat},{mt},{mat},{mt}
@@ -32,7 +25,7 @@ _BOXER_TEMPLATE_COV = """0,{mat},{mt},{mat},{mt}
 
 def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename=None, stdout=True,
                     njoy_exec='../boxer2mat/boxer2mat', boxer_exec='../boxer2mat/boxer2mat', output_base_path='./',
-                    use_temp_folder=True, chi=False):
+                    use_temp_folder=True):
     """Run NJOY to create a cov matrix in easily readable format by
     converting the BOXER output to matrix form
 
@@ -45,7 +38,7 @@ def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, 
     tapeout : dict
         Dictionary mapping tape numbers to paths for any output files
     mts : list
-        List of MT numbers to get cov info for
+        List of MT numbers to get cov info for, use 1018 for chi
     input_filename : str, optional
         File name to write out NJOY input njoy_commands
     stdout : bool, optional
@@ -56,8 +49,6 @@ def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, 
         The base file that the executable uses (likely tape or fort.)
     use_temp_folder : bool
         Option to output all intermediate files to a temp folder
-    chi : bool
-        Use when processing fission chi (mt=18, mf=5) because we use cov for this due to cover output issues
 
     Raises
     ------
@@ -98,10 +89,11 @@ def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, 
                 shutil.copy(tempnjoycovtape, tmpboxerfilename_in)
                 # use the same input multiple times for diff MTs
                 # run boxer
-                if mt == 18 and chi:
-                    boxer_commands = _BOXER_TEMPLATE_COV.format(mat=mat_num, mt=mt)
+                if mt == 1018:
+                    boxer_commands = _BOXER_TEMPLATE_COV.format(mat=mat_num, mt=18)
                 else:
-                    boxer_commands = _BOXER_TEMPLATE.format(mat=mat_num, mt=mt)
+                    boxer_commands = _BOXER_TEMPLATE_COV.format(mat=mat_num, mt=mt)
+
                 run_program(boxer_commands, boxer_exec, stdout, tmpdir, os.path.join(output_base_path, input_filename + "boxer.txt"))
                 # save the output locally
                 shutil.move(tmpboxerfilename_out, os.path.join(output_base_path, file_name + "_" + str(mt) + "_matrix.txt"))
@@ -231,7 +223,7 @@ class read_boxer_out_matrix:
         np.array
             std dev
         np.array
-            correlation matrix
+            correlation or cov matrix depending on njoy output
 
         """
 
@@ -310,13 +302,13 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
         temperatures = [temperatures]
 
     if not cov_energy_groups:
-        cov_energy_groups = njoy.energy_groups_238
+        raise Exception("Please specify energy group structure for cov groups")
 
     # ensure mt = 18 is processed, might not need this exception..
     if chi:
-        if 18 in mts:
-            raise Exception("Ambiguous parsing when both fission chi spectrum and mt=18 requested, please do one at a time.")
-        mts.append(18)
+        if 18 not in mts:
+            print("Automatically adding mt=18 needed for chi processing")
+            mts.append(18)
 
     mat_num = njoy.get_mat_from_endf(endf_file)
     njoy_commands, tapein, tapeout = njoy.make_njoy_run(endf_file, temperatures=temperatures, pendf=None, error=0.001,
@@ -332,22 +324,24 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
     if nu:
         mts.append(452)
 
+    if chi:
+        mts.append(1018)
+
     _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename="testing_chain.txt",
                      stdout=True, njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy',
                      boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat', output_base_path=output_dir,
-                     use_temp_folder=use_temp_folder, chi=chi)
+                     use_temp_folder=use_temp_folder)
 
 
 def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
-                      output_h5_format='u235_102_{0}g_cov.h5', cov_in_boxer=False):
+                      output_h5_format='u235_102_{0}g_cov.h5'):
     rbo = read_boxer_out_matrix(output_dir + boxer_matrix_name.format(mt=mt))
-    group_bounds, xsec, std_dev, corr = rbo.get_block_data()
-    groups = corr.shape[0]
+    group_bounds, xsec, std_dev, cov = rbo.get_block_data()
+    groups = cov.shape[0]
     output_h5_name = output_h5_format.format(groups)
 
-    if cov_in_boxer:
-        # covert the cov read to corr
-        corr = CovManipulation.cov_to_correlation(corr)
+    # covert the cov read to corr
+    corr = CovManipulation.cov_to_correlation(cov)
 
     with pd.HDFStore(output_dir + output_h5_name, 'a') as h:
         df = AsapyCovStorage.create_corr_df(groups)
@@ -408,16 +402,17 @@ if __name__ == "__main__":
     #     AsapyCovStorage.add_stddev_to_store(h, df, '1001', '102', '1001', '102')
 
     mts = [18, 102]
-    mts = []
-    nu = False
+    # mts = []
+    nu = True
     chi = True
     zaid = 92235
+    output_h5_format = 'u235_{0}g_cov.h5'
     output_dir = '/Users/veeshy/projects/ASAPy/u235_viii/'
     # endf_file = "/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf"
     endf_file = "/Users/veeshy/Downloads/ENDF-B-VIII.0_neutrons/n-092_U_235.endf"
 
     # cov_groups = [njoy.energy_groups_44, njoy.energy_groups_56, njoy.energy_groups_252]
-    cov_groups = [njoy.energy_groups_56]
+    cov_groups = [njoy.energy_groups_252]
 
     # from low to high, (e, flux_val) pairs
     user_flux_weight_vals = [1e-05, 0, 0.0001, 0, 0.0005, 0, 0.00075, 0, 0.001, 0, 0.0012, 0, 0.0015, 0, 0.002, 0,
@@ -473,12 +468,12 @@ if __name__ == "__main__":
                         user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi, use_temp_folder=False)
         for mt in mts:
             process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
-                              output_h5_format='u235_102_{0}g_cov.h5')
+                              output_h5_format=output_h5_format)
 
         if nu:
             process_cov_to_h5(output_dir, zaid, 452, boxer_matrix_name='covr_nu_300.txt_{mt}_matrix.txt',
-                              output_h5_format='u235_102_{0}g_cov.h5')
+                              output_h5_format=output_h5_format)
 
         if chi:
-            process_cov_to_h5(output_dir, zaid, 18, boxer_matrix_name='covr_chi_300.txt_{mt}_matrix.txt',
-                              output_h5_format='u235_102_{0}g_cov.h5', cov_in_boxer=True)
+            process_cov_to_h5(output_dir, zaid, 1018, boxer_matrix_name='covr_chi_300.txt_{mt}_matrix.txt',
+                              output_h5_format=output_h5_format)

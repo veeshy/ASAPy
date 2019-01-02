@@ -301,17 +301,7 @@ covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (PLOT) %%%%%%%%%%%%%%%%%%%%%%%%
 
     return s
 
-# this outputs correlation matrix
-_TEMPLATE_COVR_FOR_LIB = """
-covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (DATA) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-{nerr} {covr_out}/
-4/
-corr/
-/
-{mat}/
-"""
-
-# this outputs cov matrix in care correlation matrix has problems like for fission chi
+# outputting cov instead of corr seems to work better when translating to boxer due to some odd outputs like *****
 _TEMPLATE_COVR_FOR_LIB_COV_OUT = """
 covr / %%%%%%%%%%%%%%%%%%%%%%%%% Create Cov Info (DATA) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 {nerr} {covr_out}/
@@ -565,7 +555,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             covr_out = nlast + 1
             tapeout[covr_out] = fname.format("covr", temperature) + ".txt"
             nlast += 1
-            commands += _TEMPLATE_COVR_FOR_LIB.format(**locals())
+            commands += _TEMPLATE_COVR_FOR_LIB_COV_OUT.format(**locals())
 
             if covr_plot_mts:
                 covr_plot_out = nlast + 1   # needed as input to viewr
@@ -609,7 +599,7 @@ def make_njoy_run(filename, temperatures=None, ace='ace', xsdir='xsdir', pendf=N
             tapeout[covr_out] = fname.format("covr_nu", temperature) + ".txt"
             tapeout[viewr_plot_out] = fname.format("viewr_nu", temperature) + ".eps"
             nlast += 1
-            commands += _TEMPLATE_COVR_FOR_LIB.format(**locals())
+            commands += _TEMPLATE_COVR_FOR_LIB_COV_OUT.format(**locals())
 
         if chi:
             commands += "-- Chi info\n"
