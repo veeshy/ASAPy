@@ -349,6 +349,13 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
         # make sure diag is all ones
         np.fill_diagonal(corr, 1.0)
         df.loc[:, :] = corr
+
+        # if std_dev was zero anywhere,
+        if np.any(std_dev == 0):
+            print("Found 0 std_dev for {0} xsec, correcting corr to not have any NaNs.".format(sum(std_dev == 0)))
+            df.loc[std_dev == 0, :] = 0
+            df.loc[:, std_dev == 0] = 0
+
         AsapyCovStorage.add_corr_to_store(h, df, zaid, mt, zaid, mt)
         df = AsapyCovStorage.create_stddev_df(groups)
 
@@ -402,17 +409,17 @@ if __name__ == "__main__":
     #     AsapyCovStorage.add_stddev_to_store(h, df, '1001', '102', '1001', '102')
 
     mts = [18, 102]
-    # mts = []
-    nu = True
+    mts = []
+    nu = False
     chi = True
     zaid = 92235
     output_h5_format = 'u235_{0}g_cov.h5'
     output_dir = '/Users/veeshy/projects/ASAPy/u235_viii/'
-    # endf_file = "/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf"
-    endf_file = "/Users/veeshy/Downloads/ENDF-B-VIII.0_neutrons/n-092_U_235.endf"
+    endf_file = "/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf"
+    # endf_file = "/Users/veeshy/Downloads/ENDF-B-VIII.0_neutrons/n-092_U_235.endf"
 
     # cov_groups = [njoy.energy_groups_44, njoy.energy_groups_56, njoy.energy_groups_252]
-    cov_groups = [njoy.energy_groups_252]
+    cov_groups = [njoy.energy_groups_44]
 
     # from low to high, (e, flux_val) pairs
     user_flux_weight_vals = [1e-05, 0, 0.0001, 0, 0.0005, 0, 0.00075, 0, 0.001, 0, 0.0012, 0, 0.0015, 0, 0.002, 0,
