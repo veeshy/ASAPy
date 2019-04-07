@@ -23,6 +23,7 @@ class AceEditor:
         ace_path = os.path.expanduser(ace_path)
 
         self.table = neutron.IncidentNeutron.from_ace(ace_path)
+        self.original_table = neutron.IncidentNeutron.from_ace(ace_path)
 
 
         temperatures = self.table.temperatures
@@ -72,7 +73,7 @@ class AceEditor:
 
         return energy
 
-    def get_chi_distro(self, mt=18):
+    def get_chi_distro(self, mt=18, unadjusted=False):
         """
         Gets the energy distribution from mt.
 
@@ -82,6 +83,8 @@ class AceEditor:
         ----------
         mt : int
             The mt that represent fission for the desired chi distro
+        unadjusted : bool
+            Get unadjusted value
 
         Returns
         -------
@@ -98,7 +101,10 @@ class AceEditor:
 
         if fission_present:
             # get the prompt neutron yield.
-            fission_chi_prompt_product = self.table.reactions[mt].products[0]
+            if unadjusted:
+                fission_chi_prompt_product = self.original_table.reactions[mt].products[0]
+            else:
+                fission_chi_prompt_product = self.table.reactions[mt].products[0]
             fission_chi_prompt = fission_chi_prompt_product.distribution[0].energy
 
             if 'prompt' not in fission_chi_prompt_product.__repr__():
@@ -172,9 +178,15 @@ class AceEditor:
         else:
             raise IndexError("No fission MT={mt} present on ace file {ace}".format(mt=mt, ace=self.ace_path))
 
-    def get_nu_distro(self):
+    def get_nu_distro(self, unadjusted=False):
         """
         Finds \chi_T table.
+
+        Parameters
+        ----------
+        unadjusted : bool
+            Get unadjusted value
+
         Raises
         ------
         AttributeError
@@ -190,7 +202,10 @@ class AceEditor:
         """
 
         try:
-            fiss = self.table.reactions[18]
+            if unadjusted:
+                fiss = self.original_table.reactions[18]
+            else:
+                fiss = self.table.reactions[18]
         except:
             raise KeyError("Fission MT=18 not present in this ACE " + self.ace_path)
 
@@ -217,12 +232,16 @@ class AceEditor:
         self.table.reactions[18].derived_products[0].yield_.y = nu_values
 
 
-    def get_sigma(self, mt, at_energies=None):
+    def get_sigma(self, mt, at_energies=None, unadjusted=False):
         """
         Grabs sigma from the table
         Parameters
         ----------
         mt : int
+        at_energies : list-like
+            Energies to return sigmas at, interpolations performed
+        unadjusted : bool
+            Get un-adjusted xsec
 
         Returns
         -------
@@ -233,12 +252,15 @@ class AceEditor:
 
         # handle nu differently than other xsec
         if mt == 452:
-            _, sigma = self.get_nu_distro()
+            _, sigma = self.get_nu_distro(unadjusted)
         elif mt == 1018:
-            _, _, sigma, _ = self.get_chi_distro()
+            _, _, sigma, _ = self.get_chi_distro(unadjusted)
         else:
             try:
-                rx = self.table.reactions[mt].xs[self.temperature]
+                if unadjusted:
+                    rx = self.original_table.reactions[mt].xs[self.temperature]
+                else:
+                    rx = self.table.reactions[mt].xs[self.temperature]
             except KeyError:
                 raise KeyError("Could not find mt={0} in ace file".format(mt))
 
@@ -330,25 +352,31 @@ class AceEditor:
         for sum_mt, mts_in_sum in zip(sum_mts, sum_mts_list):
             # ensure the sum'd mt is present before trying to set it
             if sum_mt in self.all_mts:
+                # find out which MTs within the sum MTs are present
                 sum_mts_present = self._check_if_mts_present(mts_in_sum)
                 if sum_mts_present:
                         # check if MT was adjusted before re-summing
                         mt_adjusted_check = self._check_if_mts_present(self.adjusted_mts, compare_to=sum_mts_present)
 
                         if mt_adjusted_check:
+                            # mt_adjusted_check containts the MTs that were adjusted. Lets subtract the original xsec then add in the new one
                             # re-write this mt with the constituent mts summed
                             energies = self.get_energy(1)
-                            sigmas = np.array([self.get_sigma(mt, at_energies=energies) for mt in sum_mts_present])
+                            original_sigmas = np.array([self.get_sigma(mt, at_energies=energies, unadjusted=True) for mt in mt_adjusted_check])
+                            adjusted_sigmas = np.array([self.get_sigma(mt, at_energies=energies) for mt in mt_adjusted_check])
                             # sum all rows together
                             try:
-                                new_sum = sigmas.sum(axis=0)
+                                original_sum = original_sigmas.sum(axis=0)
+                                adjusted_sum = adjusted_sigmas.sum(axis=0)
                             except ValueError:
                                 raise ValueError("Could not sum the xsec's in mt={0}. Note: MTs 1, 3, 4, 27, 101 are "
                                                  "considered redundant, perhaps you don't need to apply the sum rule.\n\n"
                                                  "MTs in this sum that are in this ACE file:\n{1}".format(sum_mt, sum_mts_present))
-                            self.set_sigma(sum_mt, new_sum)
-                            self.adjusted_mts.add(sum_mt)
 
+                            original_sum_mt_xsec = self.get_sigma(sum_mt, at_energies=energies, unadjusted=True)
+                            self.set_sigma(sum_mt, original_sum_mt_xsec - original_sum + adjusted_sum)
+                            self.adjusted_mts.add(sum_mt)
+                        
 
     def _check_if_mts_present(self, mt_list, compare_to=None):
         """
