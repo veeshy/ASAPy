@@ -376,7 +376,7 @@ class AceEditor:
                             original_sum_mt_xsec = self.get_sigma(sum_mt, at_energies=energies, unadjusted=True)
                             self.set_sigma(sum_mt, original_sum_mt_xsec - original_sum + adjusted_sum)
                             self.adjusted_mts.add(sum_mt)
-                        
+
 
     def _check_if_mts_present(self, mt_list, compare_to=None):
         """
