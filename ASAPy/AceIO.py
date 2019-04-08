@@ -252,9 +252,9 @@ class AceEditor:
 
         # handle nu differently than other xsec
         if mt == 452:
-            _, sigma = self.get_nu_distro(unadjusted)
+            _, sigma = self.get_nu_distro(unadjusted=unadjusted)
         elif mt == 1018:
-            _, _, sigma, _ = self.get_chi_distro(unadjusted)
+            _, _, sigma, _ = self.get_chi_distro(unadjusted=unadjusted)
         else:
             try:
                 if unadjusted:
