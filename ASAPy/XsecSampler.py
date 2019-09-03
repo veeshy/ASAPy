@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.linalg as LA
-from matplotlib import gridspec
+from matplotlib import gridspec, cm
+from matplotlib.colors import ListedColormap
 from matplotlib.ticker import FormatStrFormatter
 import warnings
 
@@ -16,6 +17,16 @@ import mpi4py.MPI
 comm = mpi4py.MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
+
+# a created diverging color map from red to green with white in middle
+top = cm.get_cmap('Reds', 128)
+bottom = cm.get_cmap('Greens', 128)
+
+newcolors = np.vstack((top(np.linspace(0, 1, 128))[-1::-1],
+                     bottom(np.linspace(0, 1, 128))))
+# ensure middle value is actually white
+newcolors[128] = (1, 1, 1, 1)
+cm_RdGr = ListedColormap(newcolors, name='RdGn')
 
 class XsecSampler:
     def __init__(self, h, zaid_1, mt_1, zaid_2=None, mt_2=None, remove_negative_eig=True):
@@ -421,7 +432,8 @@ def set_log_scale(ax, log_x, log_y):
 
 
 def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zaid_2=None, mt_2=None, output_base='',
-                      log_x=True, log_y=True, log_y_stddev=False, corr_rel_diff=False):
+                      log_x=True, log_y=True, log_y_stddev=False, corr_rel_diff=False,
+                      use_max_range_for_correlation_plot=True):
     """
     Plots diag of cov, a few xsecs, and full corr matrix of the sampled data.
 
@@ -446,6 +458,8 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
         True to set std dev plot to log y axis
     corr_rel_diff : bool
         True to output original corr matrix and abs value of the difference of sampled corr and original
+    use_max_range_for_correlation_plot : bool
+        Sets range to -1, 1 on correlation plot else uses the min/max of the actual data
     """
     # plot the cov
     xsec, corr = XsecSampler.load_zaid_mt(h, zaid, mt, zaid_2, mt_2)
@@ -513,14 +527,45 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     # Plot the corr matrix
     # must flip the corr because it is in high energy to low energy form
     e_for_corr = list(xsec['e high'])
-    e_for_corr.append(xsec['e low'].values[-1])
+
+    # make sure the elow isn't 0 so if we log the data it doesn't break..
+    if xsec['e low'].values[-1] == 0:
+        elow_to_append = xsec['e low'].values[-2] / 2
+    else:
+        elow_to_append = xsec['e low'].values[-1]
+
+    e_for_corr.append(elow_to_append)
     e_for_corr = e_for_corr[-1::-1]
     X, Y = np.meshgrid(e_for_corr, e_for_corr)
 
     fig, ax = plt.subplots(ncols=2, figsize=(8, 6), sharey=True)
 
+    if corr_rel_diff:
+        corr_for_plot2 = np.abs(np.corrcoef(sample_df_full_vals) - corr.values)
+    else:
+        corr_for_plot2 = np.corrcoef(sample_df_full_vals)
+        corr_for_plot2[np.isnan(corr_for_plot2)] = 0
+
+        # if the original corr was 0 on the diag, the sampled distro was not actually sampled so lets not plot that
+        original_corr_zero_idx = np.diag(corr.values) == 0
+        corr_for_plot2[:, original_corr_zero_idx] = 0
+        corr_for_plot2[original_corr_zero_idx, :] = 0
+
+    if use_max_range_for_correlation_plot:
+        vmin = -1.0
+        vmax = 1.0
+    else:
+        vmin = np.amax(corr.values)
+        vmax = np.amin(corr.values)
+
+    if np.amax(corr_for_plot2) > vmax:
+        vmax = np.amax(corr_for_plot2)
+
+    if np.amin(corr_for_plot2) < vmin:
+        vmin = np.amin(corr_for_plot2)
+
     corr_flipped_for_plot = np.flipud(np.fliplr(corr.values))
-    im = ax[0].pcolormesh(X, Y, corr_flipped_for_plot)
+    im = ax[0].pcolormesh(X, Y, corr_flipped_for_plot, vmin=vmin, vmax=vmax, cmap=cm_RdGr)
     ax[0].set_xscale('log')
     ax[0].set_yscale('log')
 
@@ -535,19 +580,10 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     fig.colorbar(im, ax=ax[0], fraction=0.046, pad=0.04)
     ax[0].set(adjustable='box', aspect='equal')
 
-    if corr_rel_diff:
-        corr_for_plot = np.abs(np.corrcoef(sample_df_full_vals) - corr.values)
-    else:
-        corr_for_plot = np.corrcoef(sample_df_full_vals)
-        corr_for_plot[np.isnan(corr_for_plot)] = 0
+    # second corr plot
 
-        # if the original corr was 0 on the diag, the sampled distro was not actually sampled so lets not plot that
-        original_corr_zero_idx = np.diag(corr.values) == 0
-        corr_for_plot[:, original_corr_zero_idx] = 0
-        corr_for_plot[original_corr_zero_idx, :] = 0
-
-    corr_flipped_for_plot = np.flipud(np.fliplr(corr_for_plot))
-    im = ax[1].pcolormesh(X, Y, corr_flipped_for_plot)
+    corr_flipped_for_plot = np.flipud(np.fliplr(corr_for_plot2))
+    im = ax[1].pcolormesh(X, Y, corr_flipped_for_plot, vmin=vmin, vmax=vmax, cmap=cm_RdGr)
     ax[1].set_xscale('log')
     ax[1].set_yscale('log')
 
@@ -632,7 +668,14 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, 
         y_for_plot = xsec['rel.s.d.(1)'] * 100
 
     ax2.plot(e_for_plot, y_for_plot, drawstyle='steps-post')
-    set_log_scale(ax, log_x, log_y)
+
+    # auto scale y log under some conditions
+    if min(y_for_plot) > 0 and max(y_for_plot) / min(y_for_plot) > 100:
+        log_y = True
+    elif min(y_for_plot) == 0 and max(y_for_plot) > 100:
+        log_y = True
+
+    set_log_scale(ax2, log_x, log_y)
 
     ax2.set_xlabel('Energy (eV)')
     ax2.set_ylabel('% Rel. Dev.')
@@ -774,23 +817,36 @@ if __name__ == "__main__":
     import argparse
 
     # # store_name = '../scale_cov_252.h5'
-    # # store_name = '../u235/u235_102_44g_cov.h5'
+    # # store_name = '../xe135m/2015/xe_56g_cov.h5'
+    # # store_name = '/Users/veeshy/projects/ASAPy/agc/ti46_56g.h5'
+    # store_name = '../u235/u235_102_44g_cov.h5'
     # # store_name = '../u235_18_44_group.h5'
     # # store_name = '../u238_102_3_group/u238_102_3g.h5'
+    # # store_name = '../u238_102_56_group/u238_56g.h5'
     # # store_name = '/Users/veeshy/projects/ASAPy/Godiva/mcace/t_0_44_uncorr_102/u235_102_44g_cov.h5'
-    # store_name = '/Users/veeshy/projects/ASAPy/u235_viii/u235_44g_chi.h5'
+    # # store_name = '/Users/veeshy/projects/ASAPy/u235_viii/u235_44g_chi.h5'
+    # # store_name = '/Users/veeshy/projects/ASAPy/u235_viii/u235_44g_cov.h5'
+    # # store_name = '/Users/veeshy/projects/ASAPy/xe135m/2017/xe_56g_cov.h5'
+    # # store_name = '../w184_vii1/w184_252g_cov.h5'
+    # # store_name = '/Users/veeshy/projects/ASAPy/runs/u235/u235_252g_cov.h5'
     #
     # with pd.HDFStore(store_name, 'r') as h:
-    #     #  ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
+    #     # ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92238.710nc'
     #     ace_file = '~/MCNP6/MCNP_DATA/xdata/endf71x/U/92235.710nc'
+    #     # ace_file = '/Users/veeshy/projects/ASAPy/xe135m/Xe135m-n.tendl_2015.ace'
+    #     # ace_file = '/Users/veeshy/MCNP6/MCNP_DATA/xdata/endf71x/W/74184.710nc'
+    #     # zaid = 74184 #54135 #5459
     #     zaid = 92235
-    #     mts = [1018]
-    #     output_base = '../test/'
+    #
+    #     # zaid = 92235
+    #     # mts = [102, 452, 1018]
+    #     mts = [102]
+    #     output_base = '/Users/veeshy/projects/ASAPy/scratch/'
     #
     #     if rank == 0:
     #         # num_samples_to_take is the nsamples that are actually written
     #         # num_samples_to_make is the nsamples that are drawn, then potentially only a few of these are taken
-    #         num_samples_to_take = 5
+    #         num_samples_to_take = 300
     #         num_samples_to_make = num_samples_to_take
     #
     #         os.makedirs(output_base, exist_ok=True)
@@ -811,9 +867,9 @@ if __name__ == "__main__":
     #         #
     #     else:
     #         sample_dfs = None
-    #
-    #     sample_dfs = comm.bcast(sample_dfs, root=0)
-    #     write_sampled_data(h, ace_file, zaid, mts, sample_dfs, output_formatter=output_base + '/u28_{0}')
+    #     #
+    #     # sample_dfs = comm.bcast(sample_dfs, root=0)
+    #     # write_sampled_data(h, ace_file, zaid, mts, sample_dfs, output_formatter=output_base + '/W_{0}')
     #
     # exit(0)
 
