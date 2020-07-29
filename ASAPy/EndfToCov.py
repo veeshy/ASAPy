@@ -15,6 +15,7 @@ import numpy as np
 from ASAPy import AsapyCovStorage
 from ASAPy import njoy
 from ASAPy import CovManipulation
+from ASAPy.data.data import ATOMIC_SYMBOL
 
 _BOXER_TEMPLATE_COV = """0,{mat},{mt},{mat},{mt}
 1,{mat},{mt},{mat},{mt}
@@ -273,7 +274,8 @@ class read_boxer_out_matrix:
         return values
 
 def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_groups=None,
-                    iwt_fluxweight=9, user_flux_weight_vals=None, nu=False, chi=False, use_temp_folder=True):
+                    iwt_fluxweight=9, user_flux_weight_vals=None, nu=False, chi=False, use_temp_folder=True,
+                    njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy'):
     """
     Creates cov matrix and plots for mts and temperatures for the end file
     Parameters
@@ -379,108 +381,54 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
 if __name__ == "__main__":
     import pandas as pd
 
-    # run_cover_chain("../test_data/n_0125_1-H-1.dat", [18], [300],
-    #                 output_dir='../run_cover_chain_test_out/',
-    #                 cov_energy_groups=njoy.energy_groups_44)
+    # user input needed
+    output_dir = '/Users/veeshy/projects/ASAPy/agc/'
+    endf_file = "/Users/veeshy/Downloads/ENDF-B-VIII.0_neutrons/n-094_Pu_239.endf"
+    # endf_file = "/Users/veeshy/Downloads/ENDF-B-VIII.0_neutrons/n-022_Ti_046.endf"
 
-    # rbo = read_boxer_out_matrix('../run_cover_chain_test_out/covr_2400.txt_2_matrix.txt')
-    #
-    # group_bounds, xsec, std_dev, cov = rbo.get_block_data()
-    #
-    # groups = 238
-    #
-    # with pd.HDFStore('test_put.h5', 'w') as h:
-    #
-    #     df = AsapyCovStorage.create_corr_df(groups)
-    #
-    #     df.loc[:, :] = cov
-    #     AsapyCovStorage.add_corr_to_store(h, df, '1001', '102', '1001', '102')
-    #     df = AsapyCovStorage.create_stddev_df(groups)
-    #
-    #     df['e high'] = group_bounds[0:-1]
-    #     df['e low'] = group_bounds[1:]
-    #     df['x-sec(1)'] = xsec
-    #     df['x-sec(2)'] = xsec
-    #     df['rel.s.d.(1)'] = std_dev / xsec
-    #     df['rel.s.d(2)'] = std_dev / xsec
-    #     df['s.d.(1)'] = std_dev
-    #     df['s.d(2)'] = std_dev
-    #
-    #     AsapyCovStorage.add_stddev_to_store(h, df, '1001', '102', '1001', '102')
+    ev = njoy.endf.Evaluation(endf_file)
+    zaid = int("{0}{1}".format(ev.target['atomic_number'], str(ev.target['mass_number']).zfill(3)))
 
-    mts = [18, 102]
+    # get all cov data on this endf file
     mts = []
-    nu = False
-    chi = True
-    zaid = 92235
-    output_h5_format = 'u235_{0}g_cov.h5'
-    output_dir = '/Users/veeshy/projects/ASAPy/u235_viii/'
-    endf_file = "/Users/veeshy/Downloads/ENDF-B-VII.1/neutrons/n-092_U_235.endf"
-    # endf_file = "/Users/veeshy/Downloads/ENDF-B-VIII.0_neutrons/n-092_U_235.endf"
+    for r in ev.reaction_list:
+        # r containts the mf # then mt #, mf33 is cov data
+        if r[0] == 33:
+            mts.append(r[1])
+    # output as Z# followed by A# followed by _ # of groups
+    output_h5_format = f"{ATOMIC_SYMBOL[ev.target['atomic_number']]}{ev.target['mass_number']}_{{0}}g.h5"
 
-    # cov_groups = [njoy.energy_groups_44, njoy.energy_groups_56, njoy.energy_groups_252]
-    cov_groups = [njoy.energy_groups_44]
+    # need to do nu-bar and chi cov getting if fissionable.
+    if ev.target['fissionable'] == True:
+        nu = True
+        chi = True
+    else:
+        nu = False
+        chi = False
+
+    # user selection desired here
+    cov_groups = [njoy.energy_groups_252]
+    # cov_groups = [njoy.energy_groups_56]
+    # cov_groups = [njoy.energy_groups_3]
+
 
     # from low to high, (e, flux_val) pairs
-    user_flux_weight_vals = [1e-05, 0, 0.0001, 0, 0.0005, 0, 0.00075, 0, 0.001, 0, 0.0012, 0, 0.0015, 0, 0.002, 0,
-                             0.0025, 0, 0.003, 0, 0.004, 0, 0.005, 0, 0.0075, 0, 0.01, 0, 0.0253, 0, 0.03, 0, 0.04, 0,
-                             0.05, 0, 0.06, 0, 0.07, 0, 0.08, 0, 0.09, 0, 0.1, 0, 0.125, 0, 0.15, 0, 0.175, 0, 0.2, 0,
-                             0.225, 0, 0.25, 0, 0.275, 0, 0.3, 1.65542e-16, 0.325, 0, 0.35, 0, 0.375, 0, 0.4, 0, 0.45,
-                             2.03688e-14, 0.5, 0, 0.55, 0, 0.6, 0, 0.625, 0, 0.65, 0, 0.7, 4.32499e-14, 0.75, 0, 0.8, 0,
-                             0.85, 0, 0.9, 0, 0.925, 0, 0.95, 0, 0.975, 0, 1, 0, 1.01, 0, 1.02, 0, 1.03, 0, 1.04, 0,
-                             1.05, 0, 1.06, 0, 1.07, 0, 1.08, 0, 1.09, 0, 1.1, 0, 1.11, 0, 1.12, 0, 1.13, 0, 1.14, 0,
-                             1.15, 0, 1.175, 0, 1.2, 0, 1.225, 0, 1.25, 0, 1.3, 0, 1.35, 0, 1.4, 0, 1.45, 0, 1.5, 0,
-                             1.59, 7.2581e-15, 1.68, 0, 1.77, 3.730415e-13, 1.86, 6.023505e-12, 1.94, 3.867265e-11, 2,
-                             6.094728e-14, 2.12, 8.70778e-15, 2.21, 1.24952e-14, 2.3, 2.766103e-14, 2.38, 1.68347e-14,
-                             2.47, 2.942096e-14, 2.57, 3.167368e-13, 2.67, 2.956726e-14, 2.77, 0, 2.87, 0, 2.97,
-                             1.20836e-14, 3, 0, 3.05, 0, 3.15, 0, 3.5, 1.176057e-13, 3.73, 3.062711e-13, 4,
-                             1.890825e-13, 4.75, 6.664941e-12, 5, 4.179762e-13, 5.4, 1.698593e-12, 6, 4.484307e-12,
-                             6.25, 5.894356e-13, 6.5, 1.605892e-13, 6.75, 2.156568e-13, 7, 1.402583e-12, 7.15,
-                             7.535842e-14, 8.1, 7.976481e-12, 9.1, 1.0098e-12, 10, 1.026129e-12, 11.5, 5.252656e-12,
-                             11.9, 3.260186e-13, 12.9, 4.133419e-12, 13.75, 6.776711e-12, 14.4, 1.507322e-12, 15.1,
-                             7.867332e-12, 16, 1.189735e-11, 17, 9.150512e-12, 18.5, 1.757143e-11, 19, 2.747768e-12, 20,
-                             3.67381e-12, 21, 3.888112e-12, 22.5, 2.08702e-11, 25, 1.298812e-11, 27.5, 2.248686e-11, 30,
-                             4.320085e-11, 31.25, 1.24734e-11, 31.75, 6.86865e-12, 33.25, 3.885563e-11, 33.75,
-                             1.001918e-12, 34.6, 2.85754e-12, 35.5, 8.181113e-13, 37, 1.083295e-11, 38, 1.783616e-11,
-                             39.1, 2.413766e-11, 39.6, 6.692044e-13, 41, 8.652972e-12, 42.4, 2.003533e-11, 44,
-                             1.016158e-11, 45.2, 4.679973e-12, 47, 1.799009e-11, 48.3, 9.91449e-12, 49.2, 3.719541e-12,
-                             50.6, 7.328506e-12, 52, 4.051688e-12, 53.4, 9.098653e-12, 59, 2.462898e-11, 61,
-                             1.406477e-11, 65, 5.262538e-11, 67.5, 4.677212e-11, 72, 6.570865e-11, 76, 3.826738e-11, 80,
-                             6.479184e-11, 82, 2.153785e-11, 90, 1.12918e-10, 100, 1.760217e-10, 108, 1.979459e-10, 115,
-                             2.685163e-10, 119, 3.367076e-11, 122, 7.395871e-11, 186, 1.451303e-09, 192.5, 1.58983e-10,
-                             207.5, 3.132341e-10, 210, 4.037133e-11, 240, 4.729311e-10, 285, 8.961192e-10, 305,
-                             4.721722e-10, 550, 5.977819e-09, 670, 4.390113e-09, 683, 3.272614e-10, 950, 1.058667e-08,
-                             1150, 7.984139e-09, 1500, 1.666035e-08, 1550, 3.127989e-09, 1800, 1.497921e-08, 2200,
-                             2.438634e-08, 2290, 7.199611e-09, 2580, 2.452208e-08, 3000, 4.516569e-08, 3740,
-                             8.00608e-08, 3900, 1.755489e-08, 6000, 2.965444e-07, 8030, 4.16639e-07, 9500, 3.652173e-07,
-                             13000, 1.076901e-06, 17000, 1.598843e-06, 25000, 4.040156e-06, 30000, 3.004691e-06, 45000,
-                             1.124604e-05, 50000, 4.44385e-06, 52000, 1.852986e-06, 60000, 7.855586e-06, 73000,
-                             1.450502e-05, 75000, 2.404877e-06, 82000, 8.765053e-06, 85000, 3.92272e-06, 100000,
-                             2.047594e-05, 128300, 4.226679e-05, 150000, 3.486128e-05, 200000, 8.41866e-05, 270000,
-                             0.0001190256, 330000, 9.877645e-05, 400000, 0.0001112772, 420000, 3.06855e-05, 440000,
-                             3.015731e-05, 470000, 4.399281e-05, 499520, 4.228211e-05, 550000, 6.942029e-05, 573000,
-                             3.041276e-05, 600000, 3.473289e-05, 670000, 8.478525e-05, 679000, 1.033917e-05, 750000,
-                             7.777236e-05, 820000, 7.075093e-05, 861100, 3.917491e-05, 875000, 1.283088e-05, 900000,
-                             2.259757e-05, 920000, 1.759737e-05, 1010000, 7.465441e-05, 1100000, 6.84441e-05, 1200000,
-                             6.942249e-05, 1250000, 3.257224e-05, 1317000, 4.162998e-05, 1356000, 2.326474e-05, 1400000,
-                             2.539037e-05, 1500000, 5.488273e-05, 1850000, 0.0001650281, 2354000, 0.0001817054, 2479000,
-                             3.724223e-05, 3000000, 0.0001284582, 4304000, 0.0001884708, 4800000, 3.942526e-05, 6434000,
-                             6.737429e-05, 8187300, 2.228427e-05, 1e+07, 6.200051e-06, 1.284e+07, 1.935622e-06,
-                             1.384e+07, 1.369027e-07, 1.455e+07, 4.962589e-08, 1.5683e+07, 3.75955e-08, 1.7333e+07,
-                             2.094257e-08, 2e+07, 8.083706e-09]
+    user_flux_weight_vals = None
 
     for cov_energy_group in cov_groups:
-        run_cover_chain(endf_file, mts, [300],
+        # T should be user input, for each T?
+        temperature = 300
+        run_cover_chain(endf_file, mts, [temperature],
                         output_dir=output_dir, cov_energy_groups=cov_energy_group, iwt_fluxweight=6 ,
                         user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi, use_temp_folder=False)
         for mt in mts:
-            process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
+            process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name=f'covr_{temperature}.txt_{{mt}}_matrix.txt',
                               output_h5_format=output_h5_format)
 
         if nu:
-            process_cov_to_h5(output_dir, zaid, 452, boxer_matrix_name='covr_nu_300.txt_{mt}_matrix.txt',
+            process_cov_to_h5(output_dir, zaid, 452, boxer_matrix_name=f'covr_nu_{temperature}.txt_{{mt}}_matrix.txt',
                               output_h5_format=output_h5_format)
 
         if chi:
-            process_cov_to_h5(output_dir, zaid, 1018, boxer_matrix_name='covr_chi_300.txt_{mt}_matrix.txt',
+            process_cov_to_h5(output_dir, zaid, 1018, boxer_matrix_name=f'covr_chi_{temperature}.txt_{{mt}}_matrix.txt',
                               output_h5_format=output_h5_format)
