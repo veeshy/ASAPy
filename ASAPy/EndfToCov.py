@@ -11,6 +11,8 @@ from subprocess import Popen, PIPE, STDOUT, CalledProcessError
 import tempfile
 
 import numpy as np
+import argparse
+import pandas as pd
 
 from ASAPy import AsapyCovStorage
 from ASAPy import njoy
@@ -275,7 +277,8 @@ class read_boxer_out_matrix:
 
 def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_groups=None,
                     iwt_fluxweight=9, user_flux_weight_vals=None, nu=False, chi=False, use_temp_folder=True,
-                    njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy'):
+                    njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy',
+                    boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat'):
     """
     Creates cov matrix and plots for mts and temperatures for the end file
     Parameters
@@ -330,14 +333,14 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
         mts.append(1018)
 
     _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename="testing_chain.txt",
-                     stdout=True, njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy',
-                     boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat', output_base_path=output_dir,
+                     stdout=True, njoy_exec=njoy_exec,
+                     boxer_exec=boxer_exec, output_base_path=output_dir,
                      use_temp_folder=use_temp_folder)
 
 
 def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
                       output_h5_format='u235_102_{0}g_cov.h5'):
-    rbo = read_boxer_out_matrix(output_dir + boxer_matrix_name.format(mt=mt))
+    rbo = read_boxer_out_matrix(os.path.join(output_dir, boxer_matrix_name.format(mt=mt)))
     group_bounds, xsec, std_dev, cov = rbo.get_block_data()
     groups = cov.shape[0]
     output_h5_name = output_h5_format.format(groups)
@@ -345,7 +348,7 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
     # covert the cov read to corr
     corr = CovManipulation.cov_to_correlation(cov)
 
-    with pd.HDFStore(output_dir + output_h5_name, 'a') as h:
+    with pd.HDFStore(os.path.join(output_dir, output_h5_name), 'a') as h:
         df = AsapyCovStorage.create_corr_df(groups)
 
         # make sure diag is all ones
@@ -377,26 +380,118 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
 
         AsapyCovStorage.add_stddev_to_store(h, df, zaid, mt, zaid, mt)
 
+def parse_args(args):
+    """
+    Create CLI parser and does any data formatting
+
+    Parameters
+    ----------
+    args : list
+        CLI sys args
+
+    Returns
+    -------
+    argparse
+        Parsed arguments (access via dot operator)
+
+    """
+
+    parser = argparse.ArgumentParser(
+        description="Generate table-wise covariance data from ENDF data using NJOY", formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('endf_file', help="The base ENDF file to extract covariance data from")
+
+    parser.add_argument('-energy_bin_structure',
+                        choices=["SCALE_3", "SCALE_44", "SCALE_56", "SCALE_238", "SCALE_252"],
+                        help="The energy bin structure", default='SCALE_252')
+
+    parser.add_argument("-output_path", help="Path to where all outputs should be placed.", default=None)
+
+    parser.add_argument('-output_store', help="""The HDF5 store name to add covariance data to. Defaults to ZAID_#groups.
+Data will be overridden. Only store one energy_bin_structure per store
+with any number of nuclides and MTs. _#groups is automatically
+appended to the given name""", default=None)
+    parser.add_argument('-njoy_spectrum_weighting', default=6, type=int, choices=[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                        help="""The NJOY spectrum weight magic number:
+iwt          meaning
+---          -------
+ 1           read in smooth weight function
+ 2           constant
+ 3           1/e
+ 4           1/e + fission spectrum + thermal maxwellian
+ 5           epri-cell lwr
+ 6           (thermal) -- (1/e) -- (fission + fusion)
+ 7           same with t-dep thermal part
+ 8           thermal--1/e--fast reactor--fission + fusion
+ 9           claw weight function
+10           claw with t-dependent thermal part
+11           vitamin-e weight function (ornl-5505)
+12           vit-e with t-dep thermal part
+""")
+
+    parser.add_argument('-mts', help="The reaction MT numbers to sample, defaults to all available", type=int, nargs='+')
+    parser.add_argument('-temperature', help="The temperature to broaden the cross-section to for covariance representation",
+                        type=int, default=300)
+
+    parser.add_argument('--writepbs', action='store_true',
+                        help="Creates a pbs file to run this function (requires mcACE)")
+    parser.add_argument('--waitforjob', help="Job number to wait for until this job runs (requires mcACE)")
+    parser.add_argument('--subpbs', action='store_true', help="Runs the created pbs file (requires mcACE)")
+
+
+    parsed_args = parser.parse_args(args)
+
+    # ensure full path of the input / output is given to make sure we can execute the input from any
+    # location and output to any location without knowing where python was invoked
+    parsed_args.endf_file = os.path.abspath(parsed_args.endf_file)
+    if parsed_args.output_path:
+        parsed_args.output_path = os.path.abspath(parsed_args.output_path)
+    else:
+        parsed_args.output_path = './'
+
+    return parsed_args
 
 if __name__ == "__main__":
-    import pandas as pd
+    import sys
+    import warnings
+    import tables
 
-    # user input needed
-    output_dir = '/Users/veeshy/projects/ASAPy/agc/'
-    endf_file = "/Users/veeshy/Downloads/ENDF-B-VIII.0_neutrons/n-094_Pu_239.endf"
-    # endf_file = "/Users/veeshy/Downloads/ENDF-B-VIII.0_neutrons/n-022_Ti_046.endf"
+    # hide the warning where naming the HDF5 storage key starting with a number is not considered a
+    # natural name in tables. HDF5 doesn't care for pandas access so it's okay.
+    warnings.simplefilter("ignore", tables.NaturalNameWarning)
+
+    args = parse_args(sys.argv[1:])
+
+    output_dir = args.output_path
+    endf_file = args.endf_file
 
     ev = njoy.endf.Evaluation(endf_file)
     zaid = int("{0}{1}".format(ev.target['atomic_number'], str(ev.target['mass_number']).zfill(3)))
 
     # get all cov data on this endf file
-    mts = []
+    available_mts = []
     for r in ev.reaction_list:
-        # r containts the mf # then mt #, mf33 is cov data
+        # r contains the mf # then mt #, mf33 is cov data
         if r[0] == 33:
-            mts.append(r[1])
+            available_mts.append(r[1])
+
+    # make sure some cov data is available
+    if len(available_mts) == 0:
+        raise Exception(f"No covariance data found in {args.endf_file}")
+
+    # if user asked for specific MTs, make sure they are available. If so use them else use all available
+    if args.mts:
+        if not set(args.mts).issubset(set(available_mts)):
+            raise Exception(f"One of the specified covariance MTs ({args.mts}) was not found in the ENDF file (found {available_mts})")
+
+        mts = args.mts
+    else:
+        mts = available_mts
+
     # output as Z# followed by A# followed by _ # of groups
-    output_h5_format = f"{ATOMIC_SYMBOL[ev.target['atomic_number']]}{ev.target['mass_number']}_{{0}}g.h5"
+    if args.output_store is None:
+        output_h5_format = f"{ATOMIC_SYMBOL[ev.target['atomic_number']]}{ev.target['mass_number']}_{{0}}g.h5"
+    else:
+        output_h5_format = args.output_store + "{0}g.h5"
 
     # need to do nu-bar and chi cov getting if fissionable.
     if ev.target['fissionable'] == True:
@@ -407,28 +502,34 @@ if __name__ == "__main__":
         chi = False
 
     # user selection desired here
-    cov_groups = [njoy.energy_groups_252]
-    # cov_groups = [njoy.energy_groups_56]
-    # cov_groups = [njoy.energy_groups_3]
-
+    if args.energy_bin_structure == "SCALE_3":
+        cov_groups = njoy.energy_groups_3
+    elif args.energy_bin_structure == "SCALE_44":
+        cov_groups = njoy.energy_groups_44
+    elif args.energy_bin_structure == "SCALE_56":
+        cov_groups = njoy.energy_groups_56
+    elif args.energy_bin_structure == "SCALE_238":
+        cov_groups = njoy.energy_groups_238
+    elif args.energy_bin_structure == "SCALE_252":
+        cov_groups = njoy.energy_groups_252
 
     # from low to high, (e, flux_val) pairs
+    # one day we can expose this to the user
     user_flux_weight_vals = None
 
-    for cov_energy_group in cov_groups:
-        # T should be user input, for each T?
-        temperature = 300
-        run_cover_chain(endf_file, mts, [temperature],
-                        output_dir=output_dir, cov_energy_groups=cov_energy_group, iwt_fluxweight=6 ,
-                        user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi, use_temp_folder=False)
-        for mt in mts:
-            process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name=f'covr_{temperature}.txt_{{mt}}_matrix.txt',
-                              output_h5_format=output_h5_format)
+    # T should be user input, for each T?
+    temperature = args.temperature
+    run_cover_chain(endf_file, mts, [temperature],
+                    output_dir=output_dir, cov_energy_groups=cov_groups, iwt_fluxweight=args.njoy_spectrum_weighting,
+                    user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi, use_temp_folder=False)
+    for mt in mts:
+        process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name=f'covr_{temperature}.txt_{{mt}}_matrix.txt',
+                          output_h5_format=output_h5_format)
 
-        if nu:
-            process_cov_to_h5(output_dir, zaid, 452, boxer_matrix_name=f'covr_nu_{temperature}.txt_{{mt}}_matrix.txt',
-                              output_h5_format=output_h5_format)
+    if nu:
+        process_cov_to_h5(output_dir, zaid, 452, boxer_matrix_name=f'covr_nu_{temperature}.txt_{{mt}}_matrix.txt',
+                          output_h5_format=output_h5_format)
 
-        if chi:
-            process_cov_to_h5(output_dir, zaid, 1018, boxer_matrix_name=f'covr_chi_{temperature}.txt_{{mt}}_matrix.txt',
-                              output_h5_format=output_h5_format)
+    if chi:
+        process_cov_to_h5(output_dir, zaid, 1018, boxer_matrix_name=f'covr_chi_{temperature}.txt_{{mt}}_matrix.txt',
+                          output_h5_format=output_h5_format)
