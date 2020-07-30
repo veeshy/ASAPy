@@ -113,7 +113,8 @@ class XsecSampler:
         Parameters
         ----------
         sample_type : str
-            'norm' or 'lognorm' or 'uncorrelated' to perform multi-variate sampling using these distros
+            'normal' or 'lognormal' or 'uncorrelated' or 'uniform' or 'loguncorrelated' to perform multi-variate
+            sampling using these distros
         num_samples : int
             Number of samples
         raise_on_bad_sample : bool
@@ -130,11 +131,11 @@ class XsecSampler:
             Relative sample (sample / original group mean value) (groups x n)
         """
 
-        if sample_type.lower() == 'norm':
+        if sample_type.lower() == 'normal':
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
                                                        num_samples, distro='norm')
-        elif sample_type.lower() == 'lognorm':
+        elif sample_type.lower() == 'lognormal':
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
                                                        num_samples, distro='lognorm')
@@ -154,7 +155,7 @@ class XsecSampler:
                                                        num_samples, distro='lognorm')
 
         else:
-            raise Exception('Sampling type: {0} not implimented'.format(sample_type))
+            raise Exception('Sampling type: {0} not implemented'.format(sample_type))
 
         if return_relative:
             mean = self.std_dev_df['x-sec(1)'].values
@@ -170,10 +171,6 @@ class XsecSampler:
         num_samples_worked = samples.shape[1]
 
         if num_samples_worked < num_samples:
-            # if not raise_on_bad_sample:
-            #     samples = self.sample(sample_type, num_samples, raise_on_bad_sample=True,
-            #                           remove_neg=remove_neg, return_relative=return_relative)
-            # else:
             if raise_on_bad_sample:
                 raise Exception("Could not generate samples due to negative values created. Made {0} of the desired {1}".format(num_samples_worked, num_samples))
 
@@ -323,7 +320,7 @@ def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, 
 
     return std_dev_mapped_to_e_groups
 
-def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', remove_neg=False,
+def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognormal', remove_neg=False,
                 raise_on_bad_sample=False, num_samples_to_make=None):
     """
     Samples the cov store for cross-section values based on the mat_num, mt, and sample type
@@ -338,7 +335,7 @@ def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognorm', rem
         The ZAID for the cross-section to sample
     num_samples : int
     sample_type : str
-        'lognorm', 'norm', 'uncorrelated' for sampling the data
+        'lognormal', 'normal', 'uncorrelated' for sampling the data
     remove_neg : boolean
         Flag to remove samples if they are negative (Removes full samples not just sets neg to zero)
 
@@ -803,28 +800,23 @@ def create_argparser():
                         type=int, default=-1)
     parser.add_argument('--make_plots', action='store_true',
                         help="Option to create sampled cov plot, corr plot, xsec + uncertainties, and a few sampled xsec")
-    parser.add_argument('--writepbs', action='store_true', help="Creates a pbs file to run this function")
-    parser.add_argument('--waitforjob', help="Job number to wait for until this job runs")
-    parser.add_argument('--subpbs', action='store_true', help="Runs the created pbs file")
-    parser.add_argument('-distribution',
-                        help="Choose between norm. lognorm, uncorrelated, loguncorrelated, or uniform sampling", default='normal')
+    parser.add_argument('--writepbs', action='store_true', help="Creates a pbs file to run this function (requires mcACE)")
+    parser.add_argument('--waitforjob', help="Job number to wait for until this job runs (requires mcACE)")
+    parser.add_argument('--subpbs', action='store_true', help="Runs the created pbs file (requires mcACE)")
+    parser.add_argument('-distribution', choices=['normal', 'lognormal', 'uncorrelated', 'uniform', 'loguncorrelated'],
+                        help="How the distribution will be sampled", default='normal')
 
     return parser
 
 if __name__ == "__main__":
     import os
-    from coupleorigen import qsub_helper
     import argparse
 
     parser = create_argparser()
     args = parser.parse_args()
 
-    sample_choices = ['norm', 'lognorm', 'uncorrelated', 'uniform', 'loguncorrelated']
-    if args.distribution.lower() not in sample_choices:
-        raise Exception(
-            "Unknown sample distribution {0}, please choose from {1}".format(args.distribution, sample_choices))
-
     if args.writepbs:
+        from mcACE.coupleorigen import qsub_helper
         pbs_args = {}
         pbs_args['depends_on'] = args.waitforjob
 
