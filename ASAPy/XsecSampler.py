@@ -134,16 +134,16 @@ class XsecSampler:
         if sample_type.lower() == 'normal':
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
-                                                       num_samples, distro='norm')
+                                                       num_samples, distro='normal')
         elif sample_type.lower() == 'lognormal':
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
-                                                       num_samples, distro='lognorm')
+                                                       num_samples, distro='lognormal')
         elif sample_type.lower() == 'uncorrelated':
             # use a correlation of diag(1)
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values, np.diag(np.ones(len(self.std_dev_df['x-sec(1)'].values))),
-                                                       num_samples, distro='norm')
+                                                       num_samples, distro='normal')
         elif sample_type.lower() == 'uniform':
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
@@ -152,7 +152,7 @@ class XsecSampler:
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values,
                                                        np.diag(np.ones(len(self.std_dev_df['x-sec(1)'].values))),
-                                                       num_samples, distro='lognorm')
+                                                       num_samples, distro='lognormal')
 
         else:
             raise Exception('Sampling type: {0} not implemented'.format(sample_type))

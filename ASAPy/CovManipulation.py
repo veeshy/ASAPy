@@ -268,7 +268,7 @@ def normal_sample_corr(mean_values, desired_cov, num_samples, allow_singular=Fal
     m = multivariate_normal(mean=mean_values, cov=desired_cov, allow_singular=allow_singular)
     return m.rvs(num_samples)
 
-def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
+def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='normal'):
     """
     Randomally samples from a normal-multivariate distribution using LHS while attempting to get the desired_cov
 
@@ -278,7 +278,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
     desired_cov
     num_samples
     distro : str
-        norm, lognorm (no proper handling of corr conversion)
+        norm, lognormal
     Returns
     -------
 
@@ -295,8 +295,8 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
         vars_to_not_sample_idx = list(set_fix_val_idx)
 
     if min(mean_values) == 0:
-        # cannot sample 0 mean with lognorm
-        if distro == 'lognorm':
+        # cannot sample 0 mean with lognormal
+        if distro == 'lognormal':
             set_zero_mean_idx = mean_values == 0
 
             if vars_to_not_sample_idx is not None:
@@ -311,7 +311,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
 
     num_vars = len(mean_values)
 
-    if distro=='lognorm':
+    if distro=='lognormal':
         # according to
         # G. Zerovnik, et. al. Transformation of correlation coefficients between normal and lognormal distribution and implications for nuclear applications
         # we must treat the assumed correlations to be normal and transform them to lognormal to sample correclty
@@ -359,10 +359,10 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
     distro = distro.lower()
 
     # create a norm distro with mean/std_dev then sample from it using percent point func (inv of cdf percentiles)
-    if distro == 'norm':
+    if distro == 'normal':
         distro_to_sample_from = sci_norm
 
-    elif distro == 'lognorm':
+    elif distro == 'lognormal':
         # using mu/sigma from wiki + the scipy convention of loc and scale to specify the mean and sigma
         mean = [np.log(mean_values[i] / (1 + std_dev[i] ** 2 / mean_values[i] ** 2) ** 0.5) for i in range(num_vars)]
         sigma = [(np.log(1 + std_dev[i] ** 2 / mean_values[i] ** 2)) ** 0.5 for i in range(num_vars)]
@@ -381,7 +381,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
     dists = []
     with warnings.catch_warnings():
         # ignore sampling issues when log due to maybe sampling 0 log values which is supposed to be a constant number
-        if distro == 'lognorm':
+        if distro == 'lognormal':
             warnings.simplefilter("ignore")
 
         for var_num in range(num_vars):
@@ -392,7 +392,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
     dists = np.array(dists)
 
     # perform any post-processing
-    if distro == 'lognorm':
+    if distro == 'lognormal':
         dists = np.exp(dists)
         dists[np.isnan(dists)] = 1
 
@@ -415,7 +415,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
     return dists
 
 
-def __sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='norm'):
+def __sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='normal'):
     """
     Randomally samples from a normal-multivariate distribution using LHS while attempting to get the desired_cov
 
@@ -425,7 +425,7 @@ def __sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='
     desired_cov
     num_samples
     distro : str
-        norm, lognorm (no proper handling of corr conversion)
+        normal, lognormal (no proper handling of corr conversion)
     Returns
     -------
 
@@ -505,9 +505,9 @@ def __sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='
     # using the desired distro's ppf, sample the distro with the correlated uniform sample
     for i in range(num_vars):
         # create a norm distro with mean/std_dev then sample from it using percent point func (inv of cdf percentiles)
-        if distro == 'norm':
+        if distro == 'normal':
             zb[:, i] = norm.ppf(zb[:, i], loc=mean_values[i], scale=std_dev[i])
-        elif distro == 'lognorm':
+        elif distro == 'lognormal':
             # using mu/sigma from wiki + the scipy convention of loc and scale to specify the mean and sigma
             mean = np.log(mean_values[i] / (1 + std_dev[i]**2/mean_values[i]**2)**0.5)
             sigma = (np.log(1 + std_dev[i]**2/mean_values[i]**2))**0.5
