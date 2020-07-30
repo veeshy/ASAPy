@@ -27,7 +27,7 @@ _BOXER_TEMPLATE_COV = """0,{mat},{mt},{mat},{mt}
 """
 
 def _run_cover_chain(njoy_commands, tapein, tapeout, cover_tapes, mat_num, mts, input_filename=None, stdout=True,
-                    njoy_exec='../boxer2mat/boxer2mat', boxer_exec='../boxer2mat/boxer2mat', output_base_path='./',
+                    njoy_exec='njoy', boxer_exec='boxer2mat', output_base_path='./',
                     use_temp_folder=True):
     """Run NJOY to create a cov matrix in easily readable format by
     converting the BOXER output to matrix form
@@ -277,8 +277,8 @@ class read_boxer_out_matrix:
 
 def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_groups=None,
                     iwt_fluxweight=9, user_flux_weight_vals=None, nu=False, chi=False, use_temp_folder=True,
-                    njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy',
-                    boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat'):
+                    njoy_exec='njoy',
+                    boxer_exec='boxer2mat'):
     """
     Creates cov matrix and plots for mts and temperatures for the end file
     Parameters
@@ -429,13 +429,19 @@ iwt          meaning
 """)
 
     parser.add_argument('-mts', help="The reaction MT numbers to sample, defaults to all available", type=int, nargs='+')
-    parser.add_argument('-temperature', help="The temperature to broaden the cross-section to for covariance representation",
+    parser.add_argument('-temperature',
+                        help="The temperature to broaden the cross-section to for covariance representation",
                         type=int, default=300)
+    parser.add_argument('-njoy_exec', help="Path to your NJOY executable if it's not already in your $PATH",
+                        default='njoy')
+    parser.add_argument('-boxer_exec', help="Path to your boxer executable if it's not already in your $PATH",
+                        default='boxer2mat')
 
-    parser.add_argument('--writepbs', action='store_true',
-                        help="Creates a pbs file to run this function (requires mcACE)")
-    parser.add_argument('--waitforjob', help="Job number to wait for until this job runs (requires mcACE)")
-    parser.add_argument('--subpbs', action='store_true', help="Runs the created pbs file (requires mcACE)")
+    # maybe add this later
+    # parser.add_argument('--writepbs', action='store_true',
+    #                     help="Creates a pbs file to run this function (requires mcACE)")
+    # parser.add_argument('--waitforjob', help="Job number to wait for until this job runs (requires mcACE)")
+    # parser.add_argument('--subpbs', action='store_true', help="Runs the created pbs file (requires mcACE)")
 
 
     parsed_args = parser.parse_args(args)
@@ -521,7 +527,9 @@ if __name__ == "__main__":
     temperature = args.temperature
     run_cover_chain(endf_file, mts, [temperature],
                     output_dir=output_dir, cov_energy_groups=cov_groups, iwt_fluxweight=args.njoy_spectrum_weighting,
-                    user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi, use_temp_folder=False)
+                    user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi, use_temp_folder=False,
+                    njoy_exec=args.njoy_exec,
+                    boxer_exec=args.boxer_exec)
     for mt in mts:
         process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name=f'covr_{temperature}.txt_{{mt}}_matrix.txt',
                           output_h5_format=output_h5_format)
