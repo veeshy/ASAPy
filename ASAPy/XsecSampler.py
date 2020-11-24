@@ -479,6 +479,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     ax.set_xlabel("Energy (eV)")
     ax.set_ylabel("Covariance")
     plt.savefig("{2}{3}{0}_{1}_sampled_cov.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
+    plt.close(fig)
 
     # Plot some xsec
     e, st = get_mt_from_ace(ace_file, mt)
@@ -520,6 +521,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     ax.set_ylabel('Cross Section (b)')
 
     plt.savefig("{2}{3}{0}_{1}_few_sampled_xsec.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
+    plt.close(fig)
 
     # Plot the corr matrix
     # must flip the corr because it is in high energy to low energy form
@@ -599,6 +601,7 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
     fig.tight_layout()
     plt.savefig("{2}{3}{0}_{1}_sampled_corr_compare.png".format(zaid, mt, output_base, os.path.sep), dpi=450,
                 bbox_inches='tight')
+    plt.close(fig)
 
     plot_xsec(ace_file, h, zaid, mt, output_base, log_y_stddev=log_y_stddev)
 
@@ -698,6 +701,7 @@ def plot_xsec(ace_file, h, zaid, mt, output_base='./', pad_rel_y_decades=False, 
     ax2.yaxis.set_major_formatter(FormatStrFormatter('%g'))
 
     plt.savefig("{2}{3}{0}_{1}_base_xsec_with_std.png".format(zaid, mt, output_base, os.path.sep), bbox_inches='tight', dpi=450)
+    plt.close(fig)
 
 
 def write_sampled_data(h, ace_file, zaid, mts, sample_dfs_rel, output_formatter='xsec_sampled_{0}', zaid_2=None, mt_2=None):
