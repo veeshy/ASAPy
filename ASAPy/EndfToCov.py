@@ -348,6 +348,12 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
     try:
         rbo = read_boxer_out_matrix(os.path.join(output_dir, boxer_matrix_name.format(mt=mt)))
         group_bounds, xsec, std_dev, cov = rbo.get_block_data()
+        # remove very small cov enteries if the diag is very small. If you don't then it will be very
+        # difficult to sample from because the correlation matrix will have off diags greater than 1, which is not
+        # correct
+        small_cov_idx = np.diag(cov) < 1e-9
+        cov[:, small_cov_idx] = 0
+        cov[small_cov_idx, :] = 0
     except RuntimeError as e:
         print(e)
         print("Skipping zaid/mt {zaid} {mt} in {boxer_matrix_name} due to boxer output errors")
@@ -371,6 +377,8 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
             print("Found 0 std_dev for {0} xsec, correcting corr to not have any NaNs.".format(sum(std_dev == 0)))
             df.loc[std_dev == 0, :] = 0
             df.loc[:, std_dev == 0] = 0
+        # in case some very low corr was found too, fill those entries with 0's or else they are nan
+        df = df.fillna(0)
 
         AsapyCovStorage.add_corr_to_store(h, df, zaid, mt, zaid, mt)
         df = AsapyCovStorage.create_stddev_df(groups)
