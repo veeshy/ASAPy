@@ -346,8 +346,8 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
 def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
                       output_h5_format='u235_102_{0}g_cov.h5'):
 
-    # is this too big? 10 micro-barn?
-    set_std_dev_below_this_to_zero = 1e-5
+    # is this too big?
+    set_std_dev_below_this_to_zero = 1e-15
     try:
         rbo = read_boxer_out_matrix(os.path.join(output_dir, boxer_matrix_name.format(mt=mt)))
         group_bounds, xsec, std_dev, cov = rbo.get_block_data()

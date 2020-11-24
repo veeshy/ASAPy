@@ -879,7 +879,7 @@ if __name__ == "__main__":
             if mt in ace_data.all_mts:
                 adjustable_mts.append(mt)
             else:
-                print("MT={mt} not found in the ACE file, no sampling will be performed for this MT.")
+                print(f"MT={mt} not found in the ACE file, no sampling will be performed for this MT.")
 
         if len(adjustable_mts) == 0:
             print("No MTs to adjust, exiting..")

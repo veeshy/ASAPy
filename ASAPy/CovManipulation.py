@@ -290,7 +290,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
     # make sure mean/std dev are nonzero for some cases since distro functions can't handle 0 sigma
     vars_to_not_sample_idx = None
 
-    set_std_dev_below_this_to_zero = 1e-5
+    set_std_dev_below_this_to_zero = 1e-15
 
     if min(std_dev) <= set_std_dev_below_this_to_zero:
         set_fix_val_idx = std_dev <= set_std_dev_below_this_to_zero
