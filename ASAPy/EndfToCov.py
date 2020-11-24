@@ -351,7 +351,7 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
         # remove very small cov enteries if the diag is very small. If you don't then it will be very
         # difficult to sample from because the correlation matrix will have off diags greater than 1, which is not
         # correct
-        small_cov_idx = np.diag(cov) < 1e-9
+        small_cov_idx = np.abs(np.diag(cov)) < 1e-9
         cov[:, small_cov_idx] = 0
         cov[small_cov_idx, :] = 0
     except RuntimeError as e:
@@ -367,9 +367,6 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
 
     with pd.HDFStore(os.path.join(output_dir, output_h5_name), 'a') as h:
         df = AsapyCovStorage.create_corr_df(groups)
-
-        # make sure diag is all ones
-        np.fill_diagonal(corr, 1.0)
         df.loc[:, :] = corr
 
         # if std_dev was zero anywhere,
@@ -379,6 +376,9 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
             df.loc[:, std_dev == 0] = 0
         # in case some very low corr was found too, fill those entries with 0's or else they are nan
         df = df.fillna(0)
+
+        # make sure diag is all ones
+        np.fill_diagonal(df.values, 1)
 
         AsapyCovStorage.add_corr_to_store(h, df, zaid, mt, zaid, mt)
         df = AsapyCovStorage.create_stddev_df(groups)
