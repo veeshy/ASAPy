@@ -870,9 +870,21 @@ if __name__ == "__main__":
         sample_dfs = []
         sample_dfs_full = []
 
+        # remove mt's not in the ACE file and print to the user (todo: log)
+        adjustable_mts = []
+        for mt in args.mts:
+            if mt in ace_data.all_mts:
+                adjustable_mts.append(mt)
+            else:
+                print("MT={mt} not found in the ACE file, no sampling will be performed for this MT.")
+
+        if len(adjustable_mts) == 0:
+            print("No MTs to adjust, exiting..")
+            exit()
+
         with pd.HDFStore(os.path.expanduser(store_name), 'r') as h:
             if rank == 0:
-                for mt in args.mts:
+                for mt in adjustable_mts:
                     sample_df, sample_df_full = sample_xsec(h, mt, zaid, num_samples_to_take,
                                                             num_samples_to_make=num_samples_to_make,
                                                             sample_type=args.distribution, raise_on_bad_sample=False,
@@ -888,4 +900,4 @@ if __name__ == "__main__":
 
             sample_dfs = comm.bcast(sample_dfs, root=0)
             output_formatter = '{0}{1}'.format(atomic_symbol, ace_data.table.mass_number)  # mt is written by the output
-            write_sampled_data(h, ace_file, zaid, args.mts, sample_dfs, output_formatter=output_base + output_formatter + '_{0}')
+            write_sampled_data(h, ace_file, zaid, adjustable_mts, sample_dfs, output_formatter=output_base + output_formatter + '_{0}')
