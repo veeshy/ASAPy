@@ -743,8 +743,7 @@ def write_sampled_data(h, ace_file, zaid, mts, sample_dfs_rel, output_formatter=
                 # in case we get a 0 mean set it to 1.0. The sample_df sets rel_dev
                 original_sigma[original_sigma == 0] = 1
 
-                sampled_xsec = map_groups_to_continuous(e, xsec['e high'], col,
-                                                        min_e=xsec['e low'].min()) * original_sigma
+                sampled_xsec = map_groups_to_continuous(e, xsec['e high'], col,min_e=xsec['e low'].min()) * original_sigma
 
             ae.set_sigma(mt, sampled_xsec)
             ae.apply_sum_rules()

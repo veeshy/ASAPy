@@ -345,13 +345,16 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
 
 def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
                       output_h5_format='u235_102_{0}g_cov.h5'):
+
+    # is this too big? 10 micro-barn?
+    set_std_dev_below_this_to_zero = 1e-5
     try:
         rbo = read_boxer_out_matrix(os.path.join(output_dir, boxer_matrix_name.format(mt=mt)))
         group_bounds, xsec, std_dev, cov = rbo.get_block_data()
         # remove very small cov enteries if the diag is very small. If you don't then it will be very
         # difficult to sample from because the correlation matrix will have off diags greater than 1, which is not
         # correct
-        small_cov_idx = np.abs(np.diag(cov)) < 1e-9
+        small_cov_idx = np.abs(np.diag(cov)) < set_std_dev_below_this_to_zero**2
         cov[:, small_cov_idx] = 0
         cov[small_cov_idx, :] = 0
     except RuntimeError as e:
@@ -370,15 +373,10 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
         df.loc[:, :] = corr
 
         # if std_dev was zero anywhere,
-        if np.any(std_dev == 0):
+        if np.any(std_dev <= set_std_dev_below_this_to_zero):
             print("Found 0 std_dev for {0} xsec, correcting corr to not have any NaNs.".format(sum(std_dev == 0)))
-            df.loc[std_dev == 0, :] = 0
-            df.loc[:, std_dev == 0] = 0
-        # in case some very low corr was found too, fill those entries with 0's or else they are nan
-        df = df.fillna(0)
-
-        # make sure diag is all ones
-        np.fill_diagonal(df.values, 1)
+            df.loc[std_dev <= set_std_dev_below_this_to_zero, :] = 0
+            df.loc[:, std_dev <= set_std_dev_below_this_to_zero] = 0
 
         AsapyCovStorage.add_corr_to_store(h, df, zaid, mt, zaid, mt)
         df = AsapyCovStorage.create_stddev_df(groups)

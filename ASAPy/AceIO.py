@@ -69,7 +69,10 @@ class AceEditor:
         elif mt == 1018:
             _, energy, _, _ = self.get_chi_distro()
         else:
-            energy = self.table.energy[self.temperature]
+            tablexs = self.table[mt].xs
+            table = tablexs[list(tablexs.keys())[0]]
+            energy = table.x
+            # energy = self.table.energy[self.temperature]
 
         return energy
 
