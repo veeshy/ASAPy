@@ -385,7 +385,7 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
         df['s.d(2)'] = std_dev
         # set all NaN's (which presumably had 0 xsec) to sensible values for future sampling
         # values set to 1.0 \pm 1e-15 so that the point can be sampled and it won't change off of 1.0
-        df.loc[df['rel.s.d.(1)'].isna(), ('x-sec(1)', 'x-sec(2)')] = 1.0
+        df.loc[df['rel.s.d.(1)'].isna(), ('x-sec(1)', 'x-sec(2)')] = 0.0
         df.loc[df['rel.s.d.(1)'].isna(), ('s.d.(1)', 's.d(2)')] = 1e-7
         df.loc[df['rel.s.d.(1)'].isna(), ('rel.s.d.(1)', 'rel.s.d(2)')] = 1e-7
 
