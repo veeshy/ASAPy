@@ -172,6 +172,11 @@ class read_boxer_out_matrix:
         with open(file, 'r') as f:
             self.lines = f.readlines()
 
+        # check for errors
+        for line in self.lines:
+            if "***ERROR IN BOXR***" in line:
+                raise RuntimeError(f"BOXR ended in error within {file}")
+
         self.block_line_nums = self._find_block_line_nums()
 
     def _find_block_line_nums(self):
@@ -340,8 +345,14 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
 
 def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
                       output_h5_format='u235_102_{0}g_cov.h5'):
-    rbo = read_boxer_out_matrix(os.path.join(output_dir, boxer_matrix_name.format(mt=mt)))
-    group_bounds, xsec, std_dev, cov = rbo.get_block_data()
+    try:
+        rbo = read_boxer_out_matrix(os.path.join(output_dir, boxer_matrix_name.format(mt=mt)))
+        group_bounds, xsec, std_dev, cov = rbo.get_block_data()
+    except RuntimeError as e:
+        print(e)
+        print("Skipping zaid/mt {zaid} {mt} in {boxer_matrix_name} due to boxer output errors")
+        return
+
     groups = cov.shape[0]
     output_h5_name = output_h5_format.format(groups)
 
