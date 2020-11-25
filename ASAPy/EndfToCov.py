@@ -368,6 +368,10 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
     # covert the cov read to corr
     corr = CovManipulation.cov_to_correlation(cov)
 
+    # check to see if any corr are > 1 or < -1, then set them equal to the min/max
+    corr[corr > 1] = 1
+    corr[corr < -1] = -1
+
     with pd.HDFStore(os.path.join(output_dir, output_h5_name), 'a') as h:
         df = AsapyCovStorage.create_corr_df(groups)
         df.loc[:, :] = corr

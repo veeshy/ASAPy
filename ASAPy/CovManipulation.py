@@ -287,7 +287,10 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
     mean_values_original = np.array(mean_values)
     desired_corr = np.array(desired_corr)
 
-    # make sure mean/std dev are nonzero for some cases since distro functions can't handle 0 sigma
+    # don't sample from mean = 0 cases, or std_dev = 0'ish cases, or when corr on diagonal is zero,
+    # which generally happens because the ENDF cov matrix did not have any data for that element and boxer translated
+    # it to something that was read in as NAN and then converted to zeros.
+
     vars_to_not_sample_idx = None
 
     set_std_dev_below_this_to_zero = 1e-15
@@ -303,8 +306,15 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
 
             if vars_to_not_sample_idx is not None:
                 vars_to_not_sample_idx = [i + j for i,j in zip(vars_to_not_sample_idx, set_zero_mean_idx)]
+            else:
+                vars_to_not_sample_idx = set_zero_mean_idx
 
-    # only sample from things that are deemed sampleable
+    if np.any(np.diag(desired_corr) == 0):
+        set_zero_corr_to_zero = np.diag(desired_corr) == 0
+        if vars_to_not_sample_idx is not None:
+            vars_to_not_sample_idx = [i + j for i, j in zip(vars_to_not_sample_idx, set_zero_corr_to_zero)]
+
+    # only sample from things that are deemed samplable
     if vars_to_not_sample_idx:
         vars_to_sample = np.invert(vars_to_not_sample_idx)
         mean_values = mean_values[vars_to_sample]

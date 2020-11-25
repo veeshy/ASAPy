@@ -46,9 +46,12 @@ class XsecSampler:
         # load the cov and std_dev from the store
         self.std_dev_df, self.corr_df = self.load_zaid_mt(h, zaid_1, mt_1, zaid_2, mt_2)
 
-        # correct the correlation for neg eigenvalues if needed
+        # correct the correlation for neg eigenvalues if needed. Of note is that if the corr_df is all zeros,
+        # we shouldn't adjust it because this data is meant to not be there
         if remove_negative_eig:
-            self.corr_df.loc[:, :] = self._fix_non_pos_semi_def_matrix_eigen(self.corr_df.values)
+            adjusted_corr, idx = self._fix_non_pos_semi_def_matrix_eigen(self.corr_df.values)
+            self.corr_df.loc[idx, idx] = adjusted_corr
+
 
     @staticmethod
     def load_zaid_mt(h, zaid_1, mt_1, zaid_2=None, mt_2=None, fill_corr_diag=False):
@@ -197,16 +200,24 @@ class XsecSampler:
         Uses eigen-decomposition (m=PDP^-1) to fix non positive semi-definite matricies.
         If all eig > 1e-8, no changes made
 
+        Also takes care of cases where there are zero elements on the corr_matrix diagonal. Instead of
+        trying to force those cases, we just skip handling them since they will not be used in sampling.
+
         Parameters
         ----------
         corr_matrix : np.array
+        diag_non_zero : np.array
+            Indices which corr_matrix outputted should be put into the original matrix
 
         References
         ----------
         zhu2015sampling appendix a
         """
 
-        eigs, P = LA.eigh(corr_matrix)
+        diag_non_zero = np.diag(corr_matrix) > 0
+        corr_matrix_copy = corr_matrix[diag_non_zero, :][:, diag_non_zero]
+
+        eigs, P = LA.eigh(corr_matrix_copy)
         if min(eigs) <= 1e-8:
             # replace all negative and zero eigs with a small eps
             bad_index = np.where(eigs <= 1e-8)
@@ -219,10 +230,10 @@ class XsecSampler:
             fixed_corr = np.dot(np.dot(P, np.diag(eigs)), LA.inv(P))
             print('eig_replace: created eig', min(LA.eigvals(fixed_corr)))
         else:
-            fixed_corr = corr_matrix
+            fixed_corr = corr_matrix_copy
             print('No eigen replacement needed for corr matrix')
 
-        return fixed_corr
+        return fixed_corr, diag_non_zero
 
 
 def map_groups_to_continuous(e_sigma, high_e_bins, multi_group_val, max_e=None, min_e=None, value_outside_of_range=1):
