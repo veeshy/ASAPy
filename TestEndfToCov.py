@@ -37,7 +37,9 @@ class TestRunCoverChain(TestCase):
             shutil.rmtree(self.test_dir)
         os.makedirs(self.test_dir)
         EndfToCov.run_cover_chain("./test_data/n_0125_1-H-1.dat", [2, 102], [300, 2400], output_dir=self.test_dir,
-                                  user_flux_weight_vals=6, cov_energy_groups=njoy.energy_groups_238)
+                                  user_flux_weight_vals=6, cov_energy_groups=njoy.energy_groups_238,
+                                  njoy_exec='/Users/veeshy/projects/NJOY2016/bin/njoy',
+                                  boxer_exec='/Users/veeshy/projects/ASAPy/boxer2mat/boxer2mat')
 
         # check each file against gold
 
