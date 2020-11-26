@@ -25,7 +25,7 @@ from .product import Product
 from .uncorrelated import UncorrelatedAngleEnergy
 
 
-REACTION_NAME = {1: '(n,total)', 2: '(n,elastic)', 4: '(n,level)',
+REACTION_NAME = {1: '(n,total)', 2: '(n,elastic)', 3: 'nonelastic', 4: '(n,level)',
                  5: '(n,misc)', 11: '(n,2nd)', 16: '(n,2n)', 17: '(n,3n)',
                  18: '(n,fission)', 19: '(n,f)', 20: '(n,nf)', 21: '(n,2nf)',
                  22: '(n,na)', 23: '(n,n3a)', 24: '(n,2na)', 25: '(n,3na)',

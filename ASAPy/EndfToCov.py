@@ -18,6 +18,7 @@ from ASAPy import AsapyCovStorage
 from ASAPy import njoy
 from ASAPy import CovManipulation
 from ASAPy.data.data import ATOMIC_SYMBOL
+from ASAPy.data.reaction import REACTION_NAME
 
 _BOXER_TEMPLATE_COV = """0,{mat},{mt},{mat},{mt}
 1,{mat},{mt},{mat},{mt}
@@ -346,20 +347,11 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
 def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}_matrix.txt',
                       output_h5_format='u235_102_{0}g_cov.h5'):
 
-    # is this too big?
-    set_std_dev_below_this_to_zero = 1e-15
     try:
         rbo = read_boxer_out_matrix(os.path.join(output_dir, boxer_matrix_name.format(mt=mt)))
         group_bounds, xsec, std_dev, cov = rbo.get_block_data()
-        # remove very small cov enteries if the diag is very small. If you don't then it will be very
-        # difficult to sample from because the correlation matrix will have off diags greater than 1, which is not
-        # correct
-        small_cov_idx = np.abs(np.diag(cov)) < set_std_dev_below_this_to_zero**2
-        cov[:, small_cov_idx] = 0
-        cov[small_cov_idx, :] = 0
     except RuntimeError as e:
-        print(e)
-        print("Skipping zaid/mt {zaid} {mt} in {boxer_matrix_name} due to boxer output errors")
+        print(f"Skipping zaid/mt {zaid}/{mt} {REACTION_NAME[mt]} in due to boxer output errors: {e}")
         return
 
     groups = cov.shape[0]
@@ -368,19 +360,21 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
     # covert the cov read to corr
     corr = CovManipulation.cov_to_correlation(cov)
 
-    # check to see if any corr are > 1 or < -1, then set them equal to the min/max
-    corr[corr > 1] = 1
-    corr[corr < -1] = -1
+    if np.any(np.abs(corr) > 1):
+        print(f"Cov matrix for zaid/mt={zaid}/{mt} {REACTION_NAME[mt]} is ill-composed. When converting to correlation matrix, |values| greater than 1.0 were found, setting these to -1/1 as needed")
+
+        corr[corr > 1] = 1
+        corr[corr < -1] = -1
 
     with pd.HDFStore(os.path.join(output_dir, output_h5_name), 'a') as h:
         df = AsapyCovStorage.create_corr_df(groups)
         df.loc[:, :] = corr
 
         # if std_dev was zero anywhere,
-        if np.any(std_dev <= set_std_dev_below_this_to_zero):
-            print("Found 0 std_dev for {0} xsec, correcting corr to not have any NaNs.".format(sum(std_dev == 0)))
-            df.loc[std_dev <= set_std_dev_below_this_to_zero, :] = 0
-            df.loc[:, std_dev <= set_std_dev_below_this_to_zero] = 0
+        if np.any(std_dev == 0):
+            print(f"Found {sum(std_dev == 0)} std_dev that were zero. Setting correlation matrix entries to zero for these in zaid/mt={zaid}/{mt} {REACTION_NAME[mt]}")
+            df.loc[std_dev == 0, :] = 0
+            df.loc[:, std_dev == 0] = 0
 
         AsapyCovStorage.add_corr_to_store(h, df, zaid, mt, zaid, mt)
         df = AsapyCovStorage.create_stddev_df(groups)
