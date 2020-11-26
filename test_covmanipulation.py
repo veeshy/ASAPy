@@ -6,7 +6,7 @@ import numpy as np
 These tests are statistical in nature and will filly in a val grind
 """
 
-class Test_update_mcnp_input(unittest.TestCase):
+class Test_correlation_methods(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.means = np.array(np.ones(25) * 20)
@@ -60,7 +60,6 @@ class Test_update_mcnp_input(unittest.TestCase):
 
         """
         cov = cm.correlation_to_cov(self.std_dev, self.desired_corr)
-        import matplotlib.pyplot as plt
 
         dependent_samples = cm.normal_sample_corr(self.means, cov, self.samples)
 
