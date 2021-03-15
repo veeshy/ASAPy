@@ -46,6 +46,9 @@ class XsecSampler:
         # load the cov and std_dev from the store
         self.std_dev_df, self.corr_df = self.load_zaid_mt(h, zaid_1, mt_1, zaid_2, mt_2)
 
+        self.zaid = zaid_1
+        self.mt = mt_1
+
         # correct the correlation for neg eigenvalues if needed. Of note is that if the corr_df is all zeros,
         # we shouldn't adjust it because this data is meant to not be there
         if remove_negative_eig:
@@ -221,17 +224,15 @@ class XsecSampler:
         if min(eigs) <= 1e-8:
             # replace all negative and zero eigs with a small eps
             bad_index = np.where(eigs <= 1e-8)
-            print('eig_replace: got min eig', min(eigs), 'with', len(bad_index), ' eigenvalue less than 1e-8')
+            print(f'{self.zaid}/{self.mt} eig_replace: got min eig {min(eigs)} with, {len(bad_index)} eigenvalue less than 1e-8, setting min eigs to generate pos-def matrix')
 
             # set to some small number
             eigs[bad_index] = min(1e-8 * max(eigs), 1e-8)
 
             # remake the corr matrix with these bad eigenvalues removed
             fixed_corr = np.dot(np.dot(P, np.diag(eigs)), LA.inv(P))
-            print('eig_replace: created eig', min(LA.eigvals(fixed_corr)))
         else:
             fixed_corr = corr_matrix_copy
-            print('No eigen replacement needed for corr matrix')
 
         return fixed_corr, diag_non_zero
 
@@ -806,7 +807,7 @@ def create_argparser():
     parser.add_argument('base_ace', help="The base ACE file to sample from")
     parser.add_argument('cov_store', help="The ASAPy covariance store to use")
     parser.add_argument('num_samples', help="Number of samples to draw", type=int)
-    parser.add_argument('mts', help="The reaction MT number to sample", type=int, nargs='+')
+    parser.add_argument('-mts', help="The reaction MT number to sample, if not supplied all available are used", type=int, nargs='+')
 
     parser.add_argument('-mpiproc', type=int, help="Number of mpiprocs to use", default=1)
     parser.add_argument('-num_oversamples',
@@ -844,8 +845,12 @@ if __name__ == "__main__":
         else:
             mpi_cmd = ''
 
-        mts = [str(i) for i in args.mts]
-        mts = ' '.join(mts)
+        if args.mts:
+            mts = [str(i) for i in args.mts]
+            mts = ' '.join(mts)
+            mts = f"-mt {mts}"
+        else:
+            mts = ''
 
         python_to_run = mpi_cmd + 'python ' + os.path.abspath(__file__)
 
@@ -884,9 +889,17 @@ if __name__ == "__main__":
         sample_dfs = []
         sample_dfs_full = []
 
+        if args.mts:
+            mts = args.mts
+        else:
+            # read cov store keys for mts (/ZAID/MT/ZAID/MT)
+            with pd.HDFStore(os.path.expanduser(store_name), 'r') as h:
+                mts = sorted([int(i.split('/')[2]) for i in h])
+
         # remove mt's not in the ACE file and print to the user (todo: log)
+        # this occurs often when redundant cross-sections are present
         adjustable_mts = []
-        for mt in args.mts:
+        for mt in mts:
             if mt in ace_data.all_mts:
                 adjustable_mts.append(mt)
             else:
