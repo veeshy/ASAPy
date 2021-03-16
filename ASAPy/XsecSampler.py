@@ -894,7 +894,7 @@ if __name__ == "__main__":
         else:
             # read cov store keys for mts (/ZAID/MT/ZAID/MT)
             with pd.HDFStore(os.path.expanduser(store_name), 'r') as h:
-                mts = {int(i.split('/')[2]) for i in h]}
+                mts = {int(i.split('/')[2]) for i in h}
                 mts = sorted(list(mts))
 
         # remove mt's not in the ACE file and print to the user (todo: log)
