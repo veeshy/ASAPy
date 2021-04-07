@@ -112,7 +112,7 @@ class XsecSampler:
 
 
     def sample(self, sample_type, num_samples, raise_on_bad_sample=False, remove_neg=True, return_relative=True,
-               set_neg_to_zero=False):
+               set_neg_to_zero=False, mt=None):
         """
         Samples using LHS
 
@@ -131,6 +131,8 @@ class XsecSampler:
             Option to return relative values (sampled_val / mean)
         allow_singular : bool
             Option to allow singular matrix cov when sampling from norm
+        mt : int
+            MT for logging purposes
         Returns
         -------
         np.array
@@ -140,25 +142,25 @@ class XsecSampler:
         if sample_type.lower() == 'normal':
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
-                                                       num_samples, distro='normal')
+                                                       num_samples, distro='normal', mt=mt)
         elif sample_type.lower() == 'lognormal':
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
-                                                       num_samples, distro='lognormal')
+                                                       num_samples, distro='lognormal', mt=mt)
         elif sample_type.lower() == 'uncorrelated':
             # use a correlation of diag(1)
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values, np.diag(np.ones(len(self.std_dev_df['x-sec(1)'].values))),
-                                                       num_samples, distro='normal')
+                                                       num_samples, distro='normal', mt=mt)
         elif sample_type.lower() == 'uniform':
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values, self.corr_df.values,
-                                                       num_samples, distro='uniform')
+                                                       num_samples, distro='uniform', mt=mt)
         elif sample_type.lower() == 'loguncorrelated':
             samples = CovManipulation.sample_with_corr(self.std_dev_df['x-sec(1)'].values,
                                                        self.std_dev_df['s.d.(1)'].values,
                                                        np.diag(np.ones(len(self.std_dev_df['x-sec(1)'].values))),
-                                                       num_samples, distro='lognormal')
+                                                       num_samples, distro='lognormal', mt=mt)
 
         else:
             raise Exception('Sampling type: {0} not implemented'.format(sample_type))
@@ -373,7 +375,7 @@ def sample_xsec(cov_hdf_store, mt, zaid, num_samples, sample_type='lognormal', r
     xsec = XsecSampler(h, zaid, mt)
 
     sample_df_full_vals = xsec.sample(sample_type, num_samples, return_relative=False, remove_neg=remove_neg,
-                                      raise_on_bad_sample=raise_on_bad_sample)
+                                      raise_on_bad_sample=raise_on_bad_sample, mt=mt)
     mean = xsec.std_dev_df['x-sec(1)'].values
     # get the full values by multiplying in the mean by having the internal sample checker "normalize" the values to the 1/mean
 

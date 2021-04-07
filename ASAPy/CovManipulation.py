@@ -7,6 +7,7 @@ from scipy.stats.distributions import norm, uniform
 import scipy as sp
 from scipy.stats import norm as sci_norm
 from numpy.random import uniform as np_uniform
+from ASAPy.data.reaction import REACTION_NAME
 
 """
 IC Correlated Sampling from
@@ -268,7 +269,7 @@ def normal_sample_corr(mean_values, desired_cov, num_samples, allow_singular=Fal
     m = multivariate_normal(mean=mean_values, cov=desired_cov, allow_singular=allow_singular)
     return m.rvs(num_samples)
 
-def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='normal'):
+def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='normal', mt=None):
     """
     Randomally samples from a normal-multivariate distribution using LHS while attempting to get the desired_cov
 
@@ -329,7 +330,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
         # we must treat the assumed correlations to be normal and transform them to lognormal to sample correclty
         # Large anti and positive correlations along with large relative uncertainties are not allowed for log normal
 
-        print("Adjust cov from assumed normal to lognormal via G. Zerovnik")
+        print(f"Adjust cov from assumed normal to lognormal via G. Zerovnik for mt={mt} {REACTION_NAME[mt]}")
         log_corr = np.zeros(desired_corr.shape)
 
         for i in range(len(log_corr)):
