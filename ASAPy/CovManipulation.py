@@ -294,7 +294,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
 
     vars_to_not_sample_idx = None
 
-    set_std_dev_below_this_to_zero = 1e-22
+    set_std_dev_below_this_to_zero = 1e-30
 
     if min(std_dev) <= set_std_dev_below_this_to_zero:
         set_fix_val_idx = std_dev <= set_std_dev_below_this_to_zero
