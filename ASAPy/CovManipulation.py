@@ -280,6 +280,8 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
     num_samples
     distro : str
         norm, lognormal
+    mt : int
+        reaction number being parsed for better error handling
     Returns
     -------
 
@@ -329,8 +331,10 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
         # G. Zerovnik, et. al. Transformation of correlation coefficients between normal and lognormal distribution and implications for nuclear applications
         # we must treat the assumed correlations to be normal and transform them to lognormal to sample correclty
         # Large anti and positive correlations along with large relative uncertainties are not allowed for log normal
-
-        print(f"Adjust cov from assumed normal to lognormal via G. Zerovnik for mt={mt} {REACTION_NAME[mt]}")
+        if mt is not None:
+            print(f"Adjust cov from assumed normal to lognormal via G. Zerovnik for mt={mt} {REACTION_NAME[mt]}")
+        else:
+            print(f"Adjust cov from assumed normal to lognormal via G. Zerovnik for mt= NOT PROVIDED")
         log_corr = np.zeros(desired_corr.shape)
 
         for i in range(len(log_corr)):
