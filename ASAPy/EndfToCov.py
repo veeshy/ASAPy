@@ -20,6 +20,9 @@ from ASAPy import CovManipulation
 from ASAPy.data.data import ATOMIC_SYMBOL
 from ASAPy.data.reaction import REACTION_NAME
 
+REACTION_NAME[452] = "nu-bar"
+REACTION_NAME[1018] = "fission-chi"
+
 _BOXER_TEMPLATE_COV = """0,{mat},{mt},{mat},{mt}
 1,{mat},{mt},{mat},{mt}
 2,{mat},{mt},{mat},{mt}

@@ -9,6 +9,9 @@ from scipy.stats import norm as sci_norm
 from numpy.random import uniform as np_uniform
 from ASAPy.data.reaction import REACTION_NAME
 
+REACTION_NAME[452] = "nu-bar"
+REACTION_NAME[1018] = "fission-chi"
+
 """
 IC Correlated Sampling from
 https://blakeboswell.github.io/article/2016/05/30/mc-parts.html
