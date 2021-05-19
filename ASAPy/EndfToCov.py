@@ -326,7 +326,7 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
 
     mat_num = njoy.get_mat_from_endf(endf_file)
     njoy_commands, tapein, tapeout = njoy.make_njoy_run(endf_file, temperatures=temperatures, pendf=None, error=0.001,
-                                                        covr_plot_mts=mts, cov_energy_groups=cov_energy_groups,
+                                                        covr_plot_mts=None, cov_energy_groups=cov_energy_groups,
                                                         broadr=True, heatr=False, purr=False, acer=False, errorr=True,
                                                         iwt_fluxweight=iwt_fluxweight,
                                                         user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi)
@@ -362,9 +362,9 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
 
     # covert the cov read to corr
     corr = CovManipulation.cov_to_correlation(cov)
-
+    rxn = REACTION_NAME[mt] if mt in REACTION_NAME else f"REACTION NAME NOT FOUND"
     if np.any(np.abs(corr) > 1):
-        print(f"Cov matrix for zaid/mt={zaid}/{mt} {REACTION_NAME[mt]} is ill-composed. When converting to correlation matrix, |values| greater than 1.0 were found, setting these to -1/1 as needed")
+        print(f"Cov matrix for zaid/mt={zaid}/{mt} {rxn} nis ill-composed. When converting to correlation matrix, |values| greater than 1.0 were found, setting these to -1/1 as needed")
 
         corr[corr > 1] = 1
         corr[corr < -1] = -1
@@ -375,7 +375,7 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
 
         # if std_dev was zero anywhere,
         if np.any(std_dev == 0):
-            print(f"Found {sum(std_dev == 0)} std_dev that were zero. Setting correlation matrix entries to zero for these in zaid/mt={zaid}/{mt} {REACTION_NAME[mt]}")
+            print(f"Found {sum(std_dev == 0)} std_dev that were zero. Setting correlation matrix entries to zero for these in zaid/mt={zaid}/{mt} {rxn}")
             df.loc[std_dev == 0, :] = 0
             df.loc[:, std_dev == 0] = 0
 

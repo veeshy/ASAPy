@@ -834,7 +834,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.writepbs:
-        from mcACE.coupleorigen import qsub_helper
+        from coupleorigen import qsub_helper
         pbs_args = {}
         pbs_args['depends_on'] = args.waitforjob
 
