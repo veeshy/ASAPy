@@ -326,7 +326,7 @@ def run_cover_chain(endf_file, mts, temperatures, output_dir='./', cov_energy_gr
 
     mat_num = njoy.get_mat_from_endf(endf_file)
     njoy_commands, tapein, tapeout = njoy.make_njoy_run(endf_file, temperatures=temperatures, pendf=None, error=0.001,
-                                                        covr_plot_mts=None, cov_energy_groups=cov_energy_groups,
+                                                        covr_plot_mts=mts, cov_energy_groups=cov_energy_groups,
                                                         broadr=True, heatr=False, purr=False, acer=False, errorr=True,
                                                         iwt_fluxweight=iwt_fluxweight,
                                                         user_flux_weight_vals=user_flux_weight_vals, nu=nu, chi=chi)
