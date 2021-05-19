@@ -289,8 +289,7 @@ class AceEditor:
 
         energy = self.get_energy(mt)
         if len(values_to_set) != len(energy):
-            raise IndexError('Length of values_to_set provided does not match energy bins got: {0}, needed: {1}'.format(
-                len(values_to_set), len(energy)))
+            raise IndexError(f'mt:{mt} length of values_to_set provided does not match energy bins got: {len(values_to_set)}, needed: {len(energy)}')
 
         if mt not in self.original_sigma.keys():
             current_sigma = self.get_sigma(mt)
@@ -364,7 +363,7 @@ class AceEditor:
                         if mt_adjusted_check:
                             # mt_adjusted_check containts the MTs that were adjusted. Lets subtract the original xsec then add in the new one
                             # re-write this mt with the constituent mts summed
-                            energies = self.get_energy(1)
+                            energies = self.get_energy(sum_mt)
                             original_sigmas = np.array([self.get_sigma(mt, at_energies=energies, unadjusted=True) for mt in mt_adjusted_check])
                             adjusted_sigmas = np.array([self.get_sigma(mt, at_energies=energies) for mt in mt_adjusted_check])
                             # sum all rows together
