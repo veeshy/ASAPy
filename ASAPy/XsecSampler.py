@@ -822,6 +822,7 @@ def create_argparser():
     parser.add_argument('--subpbs', action='store_true', help="Runs the created pbs file (requires mcACE)")
     parser.add_argument('-distribution', choices=['normal', 'lognormal', 'uncorrelated', 'uniform', 'loguncorrelated'],
                         help="How the distribution will be sampled", default='normal')
+    parser.add_argument('--plot-only', action='store_true', help="Option to just generate plots")
 
     return parser
 
@@ -920,14 +921,16 @@ if __name__ == "__main__":
                                                             sample_type=args.distribution, raise_on_bad_sample=False,
                                                             remove_neg=True)
 
-                    if args.make_plots:
+                    if args.make_plots or args.plot_only:
                         plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full, output_base=output_base,
                                           log_y=True, log_y_stddev=False)
-
-                    sample_dfs.append(sample_df)
+                    
+                    if not args.plot_only:
+                        sample_dfs.append(sample_df)
             else:
                 sample_dfs = None
-
-            sample_dfs = comm.bcast(sample_dfs, root=0)
-            output_formatter = '{0}{1}'.format(atomic_symbol, ace_data.table.mass_number)  # mt is written by the output
-            write_sampled_data(h, ace_file, zaid, adjustable_mts, sample_dfs, output_formatter=output_base + output_formatter + '_{0}')
+            
+            if not args.plot_only:
+                sample_dfs = comm.bcast(sample_dfs, root=0)
+                output_formatter = '{0}{1}'.format(atomic_symbol, ace_data.table.mass_number)  # mt is written by the output
+                write_sampled_data(h, ace_file, zaid, adjustable_mts, sample_dfs, output_formatter=output_base + output_formatter + '_{0}')
