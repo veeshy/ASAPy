@@ -45,6 +45,11 @@ class AceEditor:
 
         self.ace_path = ace_path
         self.all_mts = list(self.table.reactions.keys())
+        # add nubar / fission chi "mts" if fission is present
+        if 18 in self.all_mts:
+            self.all_mts.append(452)
+            self.all_mts.append(1018)
+
         # store the original sigma so it will be easy to retrieve it later
         self.original_sigma = {}
         self.adjusted_mts = set()
