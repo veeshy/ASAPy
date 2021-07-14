@@ -4,11 +4,12 @@ A python based method to sample ACE data based on ENDF covariances.
 
 See ASAPY-dissertation_section.pdf for more background.
 
-Recommended install via 
+Recommended install via conda by
 
 ```commandline
-python -m venv env
-. env/bin/activate
+conda create -n asapy python=3.7 
+conda activate asapy
+conda install -c conda-forge mpich-mpicc 
 pip install .
 # these probably all won't pass because of some hard coded njoy/boxer2mat paths, sorry!
 pytest
@@ -16,7 +17,14 @@ pytest
 
 `mpi4py` is a requirement that means you need `mpicc` on your system. You can get it easily with conda https://anaconda.org/conda-forge/mpich-mpicc if you don't mind mixing conda/pip and what not. You can build it yourself too.
 
-`NJOY` is a requirement which you can get from https://github.com/njoy/NJOY2016 which also has installation instructions
+`NJOY` is a requirement which you can get from https://github.com/njoy/NJOY2016 which also has installation instructions, in general this should work and create an exectuable in the bin folder created, feel free to install it somewhere in your `$PATH`.
+
+```commandline
+mkdir bin
+cd bin
+cmake ..
+make -j16
+```
 
 `boxer2mat` is included in this repo which was copied from the NJOY manual because it is not distributed with NJOY. You can cd into that folder and simply type `make` if you have gfortran. If not you can easily edit the Makefile to use the fortran compiler of your choice (no really, the make file has 4 lines in it)
 
