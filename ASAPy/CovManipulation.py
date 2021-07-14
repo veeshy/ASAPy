@@ -1,5 +1,3 @@
-import warnings
-
 import numpy as np
 import SALib.sample.latin as lhs
 from scipy.stats import multivariate_normal
@@ -287,6 +285,8 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
         reaction number being parsed for better error handling
     Returns
     -------
+    np.array
+        Sampled data of shape: (num samples, num mean values)
 
     """
 
@@ -321,18 +321,23 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
             vars_to_not_sample_idx = [i + j for i, j in zip(vars_to_not_sample_idx, set_zero_corr_to_zero)]
 
     # only sample from things that are deemed samplable
-    if vars_to_not_sample_idx:
+    if vars_to_not_sample_idx is not None:
         vars_to_sample = np.invert(vars_to_not_sample_idx)
         mean_values = mean_values[vars_to_sample]
         std_dev = std_dev[vars_to_sample]
         desired_corr = desired_corr[vars_to_sample, :][:, vars_to_sample]
 
     num_vars = len(mean_values)
+    if num_vars == 0:
+        # nothing to sample..
+        print(f"mt={mt}: No variables to sample (all zero means or all std_dev below {set_std_dev_below_this_to_zero})")
+        return np.ones([num_samples, len(mean_values_original)]) * mean_values_original
+
 
     if distro=='lognormal':
         # according to
         # G. Zerovnik, et. al. Transformation of correlation coefficients between normal and lognormal distribution and implications for nuclear applications
-        # we must treat the assumed correlations to be normal and transform them to lognormal to sample correclty
+        # we must treat the assumed correlations to be normal and transform them to lognormal to sample correctly
         # Large anti and positive correlations along with large relative uncertainties are not allowed for log normal
         if mt is not None:
             print(f"Adjust cov from assumed normal to lognormal via G. Zerovnik for mt={mt} {REACTION_NAME[mt]}")
@@ -344,14 +349,13 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
             for j in range(len(log_corr)):
                 log_corr[i, j] = mean_values[i] * mean_values[j] / (std_dev[i] * std_dev[j]) * (np.exp(desired_corr[i, j] * np.sqrt(np.log(std_dev[i]**2 / mean_values[i]**2 + 1) * np.log(std_dev[j]**2 / mean_values[j]**2 + 1))) - 1)
 
-        with np.warnings.catch_warnings():
-            # ignore divide by zero
-            np.warnings.simplefilter("ignore")
+        # ignore divide by zero
+        with np.errstate(divide='ignore'):
             diff = np.abs(log_corr - desired_corr) / np.abs(desired_corr)
             diff[np.isnan(diff)] = 0
 
-        diff = diff.sum().sum() / len(log_corr)**2
-        print("||(Log(corr) - original) / original||) =", diff)
+        diff = diff.sum().sum() / len(log_corr)**2 * 100
+        print(f"||(Log(corr) - original) / original||) = {diff:g} % rel diff\n")
         desired_corr = log_corr
 
 
@@ -399,11 +403,8 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
 
 
     dists = []
-    with warnings.catch_warnings():
-        # ignore sampling issues when log due to maybe sampling 0 log values which is supposed to be a constant number
-        if distro == 'lognormal':
-            warnings.simplefilter("ignore")
-
+    # ignore sampling issues when log due to maybe sampling 0 log values which is supposed to be a constant number
+    with np.errstate(all='ignore' if distro == 'lognormal' else 'warn'):
         for var_num in range(num_vars):
             # dists.append([distro_to_sample_from.ppf(p, loc=mean_values[var_num], scale=std_dev[var_num]) for p in np_uniform(0.0, 1.0, num_samples)])
             dists.append([distro_to_sample_from.ppf(p, loc=mean_values[var_num], scale=std_dev[var_num]) for p in
@@ -425,7 +426,7 @@ def sample_with_corr(mean_values, std_dev, desired_corr, num_samples, distro='no
     # if set_fixed_val:
     #     dists[:, set_fix_val_idx] = mean_values_original[set_fix_val_idx]
 
-    if vars_to_not_sample_idx:
+    if vars_to_not_sample_idx is not None:
         dists_with_all_data = np.zeros((num_samples, len(vars_to_not_sample_idx)))
         dists_with_all_data[:, np.invert(vars_to_not_sample_idx)] = dists
         dists_with_all_data[:, vars_to_not_sample_idx] = mean_values_original[vars_to_not_sample_idx]

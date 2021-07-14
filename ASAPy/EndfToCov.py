@@ -362,7 +362,7 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
 
     # covert the cov read to corr
     corr = CovManipulation.cov_to_correlation(cov)
-    rxn = REACTION_NAME[mt] if mt in REACTION_NAME else f"REACTION NAME NOT FOUND"
+    rxn = REACTION_NAME[mt] if mt in REACTION_NAME else f"REACTION NAME NOT FOUND: {mt}"
     if np.any(np.abs(corr) > 1):
         print(f"Cov matrix for zaid/mt={zaid}/{mt} {rxn} nis ill-composed. When converting to correlation matrix, |values| greater than 1.0 were found, setting these to -1/1 as needed")
 
@@ -372,12 +372,8 @@ def process_cov_to_h5(output_dir, zaid, mt, boxer_matrix_name='covr_300.txt_{mt}
     with pd.HDFStore(os.path.join(output_dir, output_h5_name), 'a') as h:
         df = AsapyCovStorage.create_corr_df(groups)
         df.loc[:, :] = corr
-
-        # if std_dev was zero anywhere,
-        if np.any(std_dev == 0):
-            print(f"Found {sum(std_dev == 0)} std_dev that were zero. Setting correlation matrix entries to zero for these in zaid/mt={zaid}/{mt} {rxn}")
-            df.loc[std_dev == 0, :] = 0
-            df.loc[:, std_dev == 0] = 0
+        # allow no nan's in output
+        df = df.fillna(0)
 
         AsapyCovStorage.add_corr_to_store(h, df, zaid, mt, zaid, mt)
         df = AsapyCovStorage.create_stddev_df(groups)

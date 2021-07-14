@@ -191,7 +191,6 @@ class XsecSampler:
         """
         Creates relative sample df keeping the group structure, removing negative samples (if desired)
         """
-
         sample_df = samples / mean
         sample_df = pd.DataFrame(sample_df.T, index=range(1, len(mean) + 1))
 
@@ -553,16 +552,17 @@ def plot_sampled_info(ace_file, h, zaid, mt, sample_df, sample_df_full_vals, zai
 
     fig, ax = plt.subplots(ncols=2, figsize=(8, 6), sharey=True)
 
-    if corr_rel_diff:
-        corr_for_plot2 = np.abs(np.corrcoef(sample_df_full_vals) - corr.values)
-    else:
-        corr_for_plot2 = np.corrcoef(sample_df_full_vals)
-        corr_for_plot2[np.isnan(corr_for_plot2)] = 0
+    with np.errstate(all='ignore'):
+        if corr_rel_diff:
+            corr_for_plot2 = np.abs(np.corrcoef(sample_df_full_vals) - corr.values)
+        else:
+            corr_for_plot2 = np.corrcoef(sample_df_full_vals)
+            corr_for_plot2[np.isnan(corr_for_plot2)] = 0
 
-        # if the original corr was 0 on the diag, the sampled distro was not actually sampled so lets not plot that
-        original_corr_zero_idx = np.diag(corr.values) == 0
-        corr_for_plot2[:, original_corr_zero_idx] = 0
-        corr_for_plot2[original_corr_zero_idx, :] = 0
+            # if the original corr was 0 on the diag, the sampled distro was not actually sampled so lets not plot that
+            original_corr_zero_idx = np.diag(corr.values) == 0
+            corr_for_plot2[:, original_corr_zero_idx] = 0
+            corr_for_plot2[original_corr_zero_idx, :] = 0
 
     if use_max_range_for_correlation_plot:
         vmin = -1.0
