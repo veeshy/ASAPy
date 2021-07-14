@@ -872,7 +872,7 @@ if __name__ == "__main__":
         # do all this on all procs to avoid writing comm code..
         ace_file = args.base_ace
         ace_data = AceIO.AceEditor(ace_file)
-        zaid = str(ace_data.table.atomic_number) + str(ace_data.table.mass_number)
+        zaid = str(ace_data.table.atomic_number) + str(ace_data.table.mass_number).zfill(3)
         atomic_symbol = ace_data.table.atomic_symbol
 
         store_name = args.cov_store
